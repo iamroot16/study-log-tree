@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Linux Kerenel v5.1 Study Log tree</title>
+</head>
+<body>
+
+<h4>IAMROOT16 Linux Kerenel v5.1 study log tree</h4>
+<ol class="tree">
+    <li>
+        <label for="menu-1">head.S</label>
+        <input type="checkbox" id="menu-1" />
+        <ol>
+            <li class="file"><a href="">000 (2019-05-18) : OT</a></li>
+            <li class="file"><a href="">001 (2019-05-25) : A, B, C 각 조별 스터디</a></li>
+            <li class="file"><a href="">...</a></li>
+            <li class="file"><a href="">020 (2019-10-26) : A, B, C 각 조별 스터디</a></li>
+            <li class="file"><a href="">021 (2019-11-02) : 통합 연습 스터디</a></li>
+            <li class="file"><a href="">022 (2019-11-09) : 통합 연습 스터디 2</a></li>
+            <li class="file"><a href="">023 (2019-11-16) : 통합 전 각 조별 스터디</a></li>
+            <li class="file"><a href="">024 (2019-11-23)</a></li>
+            <li class="file"><a href="">025 (2019-11-30)</a></li>
+            <li class="file"><a href="">026 (2019-12-07)</a></li>
+            <li class="file"><a href="">027 (2019-12-14)</a></li>
+        </ol>
+    </li>
+    
+    <li>
+        <label for="menu-2">start_kernel :: setup_arch()</label>
+        <input type="checkbox" id="menu-2" />
+        <ol>
+            <li>
+                <label for="menu-2-1-1">036 (2020-02-29) arm64_memblock_init</label>
+                <input type="checkbox" id="menu-2-1-1" />
+                <ol>
+                    <li class="file"><a href="">
+                        036 (2020-02-29)
+                        setup_arch
+                        - arm64_memblock_init
+                        -- early_init_fdt_scan_reserved_mem 까지 진행
+                    </a></li>
+                        
+                    <li class="file"><a href="">
+                            037 (2020-03-07)
+                        setup_arch
+                        - arm64_memblock_init
+                        -- dma_contiguous_reserve
+                        --- dma_contiguous_reserve_area
+                        ---- cma_declare_contiguous
+                        ----- cma_init_reserved_mem 이전 까지 진행
+                    </a></li>
+                </ol>
+            </li>
+            <li>
+                <label for="menu-2-2-1">038 (2020-03-14) paging_init</label>
+                <input type="checkbox" id="menu-2-2-1" />
+                <ol>
+                    <li class="file"><a href="">
+                        038 (2020-03-14)
+                        setup_arch
+                        - paging_init
+                        -- map_kernel 까지 진행
+                        </a></li>
+                        
+                        <li class="file"><a href="">039 (2020-03-21)</a></li>
+                        <li class="file"><a href="">040 (2020-03-28)</a></li>
+                </ol>
+            </li>
+            <li>
+                <label for="menu-2-3-1">041 (2020-04-04) unflatten_device_tree</label>
+                <input type="checkbox" id="menu-2-3-1" />
+                <ol>
+                    <li class="file"><a href="">
+                        041 (2020-04-04)
+                        setup_arch
+                        - unflatten_device_tree
+                        -- __unflatten_device_tree
+                        --- unflatten_dt_nodes
+                        ---- populate_node
+                        ----- populate_properties
+                        ------ “if (!has_name) {“ 이전 까지 진행
+                    </a></li>
+                    <li class="file"><a href="">
+                        042 (2020-04-11)
+                        setup_arch
+                        - unflatten_device_tree
+                        -- unittest_unflatten_overlay_base 이전 까지 진행
+                    </a></li>
+                </ol>
+            </li>
+            <li>
+                <label for="menu-2-4-1">043 (2020-04-18) arm64_numa_init</label>
+                <input type="checkbox" id="menu-2-4-1" />
+                <ol>
+                    <li class="file"><a href="">
+                        043 (2020-04-18)
+                        setup_arch
+                        - arm64_numa_init
+                        -- of_numa_init
+                        --- of_numa_parse_memory_nodes
+                        ---- of_address_to_resource
+                        ----- of_get_address
+                        ------ of_get_property 이전 까지 진행
+                    </a></li>
+                    <li class="file"><a href="">044 (2020-04-25)</a></li>
+                </ol>
+            </li>
+            <li>
+                <label for="menu-2-5-1">045 (2020-05-09) bootmem_init</label>
+                <input type="checkbox" id="menu-2-5-1" />
+                <ol>
+                    <li class="file"><a href="">
+                        045 (2020-05-09)
+                        setup_arch
+                        - bootmem_init
+                        -- memblocks_present
+                        --- memory_present
+                        ---- section_mark_present 이전 까지 진행
+                    </a></li>
+                    <li class="file"><a href="">
+                        046 (2020-05-16)
+                        setup_arch
+                        - bootmem_init
+                        -- spare_init
+                        --- sparse_init_nid
+                        ---- sparse_mem_map_populate(vmemmap)
+                        ----- pfn_to_page. 까지 진행
+                    </a></li>
+                    <li class="file"><a href="">
+                        047 (2020-05-23)
+                        setup_arch
+                        - bootmem_init
+                        -- spare_init
+                        --- sparse_init_nid
+                        ---- check_usemap_section_nr 이전 까지 진행
+                        </a></li>
+                    <li class="file"><a href="">
+                        048 (2020-05-30)
+                        setup_arch
+                        - bootmem_init
+                        -- zone_sizes_init
+                        --- free_area_init_nodes
+                        ---- find_zone_movable_pfns_for_nodes
+                        ----- “if (required_kernelcore_percent)” 이전 까지 진행
+                    </a></li>
+                    <li class="file"><a href="">
+                        049 (2020-06-06)
+                        setup_arch
+                        - bootmem_init
+                        -- zone_sizes_init
+                        --- free_area_init_nodes
+                        ---- free_area_init_node
+                        ----- calculate_node_totalpages
+                        ------ zone_spanned_pages_in_node 이전 까지 진행
+                    </a></li>
+                    <li class="file"><a href="">
+                        050 (2020-06-13)
+                        setup_arch
+                        - bootmem_init
+                        -- zone_sizes_init
+                        --- free_area_init_nodes
+                        ---- free_area_init_node
+                        ----- free_area_init_core
+                        ------ memmap_init
+                        ------- memmap_init_zone
+                        -------- __init_single_page 이전 까지 완료
+                    </a></li>
+                    <li class="file"><a href="">
+                        051 (2020-06-20)
+                        setup_arch
+                        - bootmem_init 까지 진행
+                    </a></li>
+                    <li class="file"><a href="">
+                        052 (2020-06-27)
+                        setup_arch
+                        - bootmem_init 리뷰
+                    </a></li>
+                    <li class="file"><a href="">
+                        053 (2020-07-04)
+                        setup_arch
+                        - bootmem_init 리뷰 2
+                    </a></li>
+                </ol>
+            </li>
+        </ol>
+    </li>
+    
+    <li>
+        <label for="menu-3">055 (2020-07-18) start_kernel :: setup_per_cpu_areas()</label>
+        <input type="checkbox" id="menu-3" />
+        <ol>
+            <li class="file"><a href="">
+                055 (2020-07-18)
+                setup_per_cpu_areas
+                - pcpu_embed_first_chunk
+                -- pcpu_build_alloc_info
+                --- "max_upa = upa;" 까지 진행
+            </a></li>
+            <li class="file"><a href="">
+                056 (2020-07-25)
+                setup_per_cpu_areas
+                - pcpu_embed_first_chunk
+                -- pcpu_setup_first_chunk
+                --- PCPU_SETUP_BUG_ON 까지 진행
+            </a></li>
+            <li class="file"><a href="">
+                057 (2020-08-01)
+                setup_per_cpu_areas
+                - pcpu_embed_first_chunk
+                -- pcpu_setup_first_chunk
+                --- pcpu_alloc_first_chunk
+                ---- pcpu_block_update_hint_alloc 이전 까지 진행
+            </a></li>
+            <li class="file"><a href="">
+                058 (2020-08-08)
+                setup_per_cpu_areas 완료 후 리뷰
+            </a></li>
+            <li class="file"><a href="">
+                059 (2020-08-29)
+                per-cpu 개념 복습
+                static-key 개념
+            </a></li>
+        </ol>
+    </li>
+    
+    <li>
+        <label for="menu-4">063 (2020-09-26) start_kernel :: smp_prepare_boot_cpu</label>
+        <input type="checkbox" id="menu-4" />
+        <ol>
+            <li class="file"><a href="">
+                063 (2020-09-26)
+                start_kernel
+                - smp_prepare_boot_cpu
+                -- apply_boot_alternatives
+                --- __apply_alternatives
+                ---- patch_alternative
+                ----- get_alt_insn 
+            </a></li>
+            <li class="file"><a href="">
+                064 (2020-10-10)
+                -smp_prepare_boot_cpu
+                -- init_gic_priority_masking
+            </a></li>
+        </ol>
+    </li>
+
+    <li>
+        <label for="menu-5">065 (2020-10-17) start_kernel :: build_all_zonelists</label>
+        <input type="checkbox" id="menu-5" />
+        <ol>
+            <li class="file"><a href="">
+                065 (2020-10-17)
+                build_all_zonelists   (init/main.c)
+                - build_all_zonelists_init  (mm/page_alloc.c)
+                --  for_each_possible_cpu  (mm/page_alloc.c) 
+            </a></li>
+        </ol>
+    </li>
+    
+    <li>
+        <label for="menu-6">066 (2020-10-24) start_kernel :: page_alloc_init</label>
+        <input type="checkbox" id="menu-6" />
+        <ol>
+            <li class="file"><a href="">
+                066 (2020-10-24)
+                - page_alloc_init
+                -- page_alloc_cpu_dead
+                --- lru_add_drain_cpu
+                ____ __pagevec_lru_add_fn
+            </a></li>
+        </ol>
+    </li>
+
+    <li>
+        <label for="menu-7">067 (2020-10-31) Buddy System</label>
+        <input type="checkbox" id="menu-7" />
+        <ol>
+
+            <li class="file"><a href="">
+                067 (2020-10-31)
+                Mastering linux kernel development,
+                Chap 4. Memory Management and Allocators 중
+                Page mobility and placement 까지 읽음 (p122 시작부)
+            </a></li>
+                
+                <li class="file"><a href="">
+                068 (2020-11-07)
+                1. 책 : Mastering linux kernel development
+                Chap 4. Memory Management and Allocators (pp.124-139)
+                2. 코드 분석
+                alloc_pages (include/linux/gfp.h)
+                - alloc_pages_current (mm/mempolicy.c)
+                -- __alloc_pages_nodemask (mm/page_alloc.c) 분석하다가 중단
+                --- get_page_from_freelist
+                ---- rmqueue
+                ----- __rmqueue_smallest 분석 완료
+                ------ rmv_page_order
+                ------- __ClearPageBuddy (include/linux/page-flags.h:716)
+                ------ expand
+                ------- set_page_guard
+                ------- set_page_order
+                -------- __SetPageBuddy (include/linux/page-flags.h:716)
+            </a></li>
+                
+            <li class="file"><a href="">
+                069 (2020-11-14)
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- get_page_from_freelist
+                ----- zone_watermark_fast
+                ------ __zone_watermark_ok 진행 中
+            </a></li>
+                
+            <li class="file"><a href="">
+                070 (2020-11-21)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- get_page_from_freelist
+                ----- rmqueue
+                ------ __rmqueue
+                ------- _rmqueue_fallback
+                -------- steal_suitable_fallback
+                --------- move_freepages_block
+            </a></li>
+
+            <li class="file"><a href="">
+                071 (2020-11-28)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- get_page_from_freelist
+                ----- rmqueue
+                ------ __mod_zone_freepage_state 
+                ------- __mod_zone_page_state
+            </a></li>
+
+            <li class="file"><a href="">
+                072 (2020-12-5)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- get_page_from_freelist -> 완료
+            </a></li>
+
+            <li class="file"><a href="">
+                073 (2020-12-12)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c)
+                ---------- compaction_suitable (mm/compaction.c)
+                ----------- __compaction_suitable (mm/compaction.c) -> 완료
+            </a></li>
+
+            <li class="file"><a href="">
+                074 (2020-12-19)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c) -> migrate_prep_local() 까지 보고, 뒤의 while 부터 볼차례 
+            </a></li>
+
+            <li class="file"><a href="">
+                075 (2021-1-9)
+                
+                __alloc_pages_slowpath 복습
+            </a></li>
+
+            <li class="file"><a href="">
+                076 (2021-1-16)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c) 
+                
+                --------- isolate_migratepages (mm/compaction.c) -> 1798 isolation_suitable() 부터 볼차례 
+            </a></li>
+
+            <li class="file"><a href="">
+                077 (2021-1-23)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c) 
+                
+                --------- isolate_migratepages (mm/compaction.c) 
+                
+                ---------- isolate_migratepages_block (mm/compaction.c) -> 1006 isolate_fail: 부터 볼차례 (+ vmstat.c 536 mod_node_state() 정리)
+            </a></li>
+
+            <li class="file"><a href="">
+                078 (2021-1-30)
+                
+                리눅스 커널의 이해(3판)
+                 9장. 프로세스 주소공간 : p399 '주소 공간 밖의 잘못된 주소 처리하기' 까지 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                079 (2021-2-6)
+                
+                리눅스 커널의 이해(3판)
+                 9장. 프로세스 주소공간 p408 '불연속적인 메모리 영역 접근 처리'까지 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                080 (2021-2-20)
+                
+                리눅스 커널의 이해(3판)
+                
+                 12장 - 가상 파일 시스템 역할, 파일 객체, 아이노드 객체, 디엔트리 객체, 디엔트리 객체 캐시
+                
+                 15장 - 페이지 캐시에서 페이지 캐시처리 함수 부분
+            </a></li>
+
+            <li class="file"><a href="">
+                081 (2021-2-27)
+                
+                리눅스 커널의 이해(3판)
+                
+                 17장 - 페이지 프레임 회수 p692 'LRU 리스트 시이의 페이지 이동'까지 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                082 (2021-3-6)
+                
+                리눅스 커널의 이해(3판)
+                
+                 17장 - 페이지 프레임 회수 p705 '아이노드 캐시에서 페이지 프레임 회수하기'까지 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                083 (2021-3-13)
+                
+                리눅스 커널의 이해(3판)
+                
+                 17장 - 페이지 프레임 회수 p720 'sys_swapoff() 서비스 루틴'까지 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                084 (2021-3-20)
+                
+                리눅스 커널의 이해(3판)
+                
+                 17장 - 페이지 프레임 회수 p730 '스왑 캐시에서 페이지 프레임 제거하기'까지 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                085 (2021-3-27)
+                
+                리눅스 커널의 이해(3판)
+                
+                 17장 - 페이지 프레임 회수 마치고 요약정리 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                086 (2021-4-3)
+                
+                Understanding the Linux Virtual Memory Manager
+                
+                 10. Page Frame Reclamation 진행
+            </a></li>
+
+            <li class="file"><a href="">
+                087 (2021-4-10)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c) -> 2181 migrate_pages() 전까지 진행 
+            </a></li>
+
+            <li class="file"><a href="">
+                088 (2021-4-17)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c)
+                
+                --------- migrate_pages (mm/compaction.c) -> unmap_and_move_huge_page()보다 unmap_and_move()를 먼저 분석
+                
+                ---------- unmap_and_move  (mm/migrate.c) -> get_new_page() : compaction에서는 compaction_alloc()함수 호출
+                
+                ------------ compaction_alloc (mm/compaction.c)
+                
+                ------------- isolate_freepages (mm/compaction.c) -> 1465행 for문부터 볼차례
+            </a></li>
+
+            <li class="file"><a href="">
+                089 (2021-4-24)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c)
+                
+                --------- migrate_pages (mm/compaction.c) -> unmap_and_move_huge_page()보다 unmap_and_move()를 먼저 분석
+                
+                ---------- unmap_and_move  (mm/migrate.c)
+                
+                ----------- __unmap_and_move (mm/migrate.c)
+                
+                ------------ move_to_new_page (mm/migrate.c)
+                
+                ------------- migrate_page (mm/migrate.c)
+                
+                -------------- migrate_page_move_mapping (mm/migrate.c) -> 454행 dirty = PageDirty(page); 부터 볼차례
+            </a></li>
+
+            <li class="file"><a href="">
+                090 (2021-5-1)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c)
+                
+                --------- migrate_pages (mm/compaction.c) -> unmap_and_move_huge_page()보다 unmap_and_move()를 먼저 분석
+                
+                ---------- unmap_and_move  (mm/migrate.c)
+                
+                ----------- __unmap_and_move (mm/migrate.c) -> 1089행 move_to_new_page()함수 다음줄 부터 볼차례
+            </a></li>
+
+            <li class="file"><a href="">
+                091 (2021-5-8)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c)
+                
+                --------- migrate_pages (mm/compaction.c) -> unmap_and_move_huge_page()보다 unmap_and_move()를 먼저 분석
+                
+                ---------- unmap_and_move  (mm/migrate.c)
+                
+                ----------- __unmap_and_move (mm/migrate.c) 
+                
+                ------------ try_to_unmap(mm/rmap.c) -> rmap_walk_lock보다 rmap_walk부터 분석
+                
+                ------------- rmap_walk(mm/rmap.c) -> rmap_walk_ksm와 rmap_walk_file보다 rmap_walk_anon부터 분석
+                
+                -------------- rmap_walk_anon(mm/rmap.c) - rmap_one -> try_to_unmap_one
+                
+                --------------- try_to_unmap_one(mm/rmap.c)
+                
+                ---------------- page_vma_mapped_walk (mm/page_vma_mapped.c) -> 183행 pmde = READ_ONCE(*pvmw->pmd); 부터 볼차례
+            </a></li>
+
+            <li class="file"><a href="">
+                092 (2021-5-15)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c)
+                
+                --------- migrate_pages (mm/compaction.c) -> unmap_and_move_huge_page()보다 unmap_and_move()를 먼저 분석
+                
+                ---------- unmap_and_move  (mm/migrate.c)
+                
+                ----------- __unmap_and_move (mm/migrate.c) 
+                
+                ------------ try_to_unmap(mm/rmap.c) -> rmap_walk_lock보다 rmap_walk부터 분석
+                
+                ------------- rmap_walk(mm/rmap.c) -> rmap_walk_ksm와 rmap_walk_file보다 rmap_walk_anon부터 분석
+                
+                -------------- rmap_walk_anon(mm/rmap.c) - rmap_one -> try_to_unmap_one
+                
+                --------------- try_to_unmap_one(mm/rmap.c)
+                
+                ---------------- put_page (include/linux/mm.h) __put_page부터 볼차례, 버디시스템 해지 : free_pages (mm/page_alloc.c) 분석 예정
+            </a></li>
+        </ol>
+    </li>
+
+    <li>
+        <label for="menu-8">093 (2021-5-22) :: memory compaction</label>
+        <input type="checkbox" id="menu-8" />
+        <ol>
+            <li class="file"><a href="">
+                093 (2021-5-22)
+                
+                - alloc_pages (include/linux/gfp.h)
+                -- alloc_pages_current (mm/mempolicy.c)
+                --- __alloc_pages_nodemask (mm/page_alloc.c)
+                ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                ------ try_to_compact_pages (mm/compaction.c)
+                ------- compact_zone_order (mm/compaction.c)  
+                -------- compact_zone (mm/compaction.c) -> check_drain: 부터 시작, compaction 및 rmap 다시 볼 예정
+            </a></li>
+
+            <li class="file"><a href="">
+                094 (2021-5-29)
+                
+                compaction 관련 중요한 commit을 시간순으로 리뷰
+                
+                -5e1f0f098b4649fad53011246bcaeff011ffdf5d mm, compaction: capture a page under direct compaction
+                -1fb3f8ca0e9222535a39b884cb67a34628411b9f mm: compaction: capture a suitable high-order page immediately when it is made available
+                -85aa125f001f87f96a72e9e6ee515490843b1202 mm: compaction: introduce isolate_freepages_range()
+                -2fe86e0004076128f05d5a774b5c9c03d9dc3de2 mm: compaction: introduce isolate_migratepages_range()
+                -3e7d344970673c5334cf7b5bb27c8c0942b06126 mm: vmscan: reclaim order-0 and use compaction instead of lumpy reclaim
+            </a></li>
+
+            <li class="file"><a href="">
+                095 (2021-6-5)
+                
+                compaction 관련 중요한 commit을 시간순으로 리뷰 끝. 
+            </a></li>
+        </ol>
+    </li>
+
+    <li>
+        <label for="menu-9">096 (2021-6-12) :: rmap</label>
+        <input type="checkbox" checked id="menu-9" />
+        <ol>
+            <li class="file"><a href=""></a>
+                096 (2021-6-12)
+
+                rmap 리뷰 (fork, anon_vma)​
+            </a></li>
+            <li class="file"><a href="">
+                097 (2021-6-19)
+
+                rmap.h의 commit을 시간 순으로 리뷰​
+            </a></li>
+            <li class="file"><a href="">
+                097 (2021-6-26)
+    
+                linear_page_index() 함수의  pgoff 를 중심으로
+                AV, VMA 분석
+
+                커널 관점의 mmap() 시스템콜 분석
+
+                MAP_SHARED
+                pgoff = 0;
+                https://github.com/iamroot16/linux/commit/ce36394269ccd9d1d286d6192ba09fa6894365e9
+
+            </a></li>
+        </ol>
+    </li>
+    
+</ol>
+
+<style>
+*{margin:0;padding:0;}
+body{padding:100px;background:#929292;font-size:100%;font-family:"Arial";}
+input{font-size:1em;}
+ol.tree{padding-left:30px;}
+li{list-style-type:none;color:#fff;position:relative;margin-left:-15px;}
+li label{padding-left:37px;cursor:pointer;background:url("https://www.thecssninja.com/demo/css_tree/folder-horizontal.png") no-repeat 15px 2px;display:block;}
+li input{width:1em;height:1em;position:absolute;left:-0.5em;top:0;opacity:0;cursor:pointer;}
+li input + ol{height:1em;margin:-16px 0 0 -44px;background:url("https://www.thecssninja.com/demo/css_tree/toggle-small-expand.png") no-repeat 40px 0;}
+li input + ol > li{display:none;margin-left:-14px !important;padding-left:1px}
+li.file{margin-left:-1px !important;}
+li.file a{display:inline-block;padding-left:21px;color:#fff;text-decoration:none;background:url("https://www.thecssninja.com/demo/css_tree/document.png") no-repeat 0 0;}
+li input:checked + ol{height:auto;margin:-21px 0 0 -44px;padding:25px 0 0 80px;background:url("https://www.thecssninja.com/demo/css_tree/toggle-small.png") no-repeat 40px 5px;}
+li input:checked + ol > li{display:block;margin:0 0 0.063em;}
+li input:checked + ol > li:first-child{margin:0 0 0.125em;}
+</style>
+
+</body>
+
+</html>
