@@ -6,20 +6,22 @@
 <body>
 
     <header>
-        <h1>IAMROOT16 Linux kernel v5.1 study log tree</h1>
+        <h2>IAMROOT16 Linux kernel v5.1 study log tree</h2>
     </header>
 
     <section>
         <p>
-            <h4>We planed studying on week [001 ~ 067] Linux kernel boot flow, reviewed source code line by line.</h4>
-        </p>
-        <p>
-            <h4>After week 067, We have reviewed the source code in units of Linux kernel subsystems.</h4>
+            We planed studying on week [001 ~ 067] Arm64 Linux kernel boot flow.
+            so, we reviewed source code line by line,
+            from <i>arch/arm64/kernel/head.S</i> to <i>init/main.c::start_kernel() → mm/page_alloc.c::page_alloc_init()</i>.
+            <br>
+            After week [067 ~ ], we decided to learn each subsystem unit of the Linux kernel,
+            starting target was the <i>buddy system</i>.
         </p>
     </section>
 
-    <nav>
-        <ol class="tree">
+    <nav id="container">
+        <ol>
             <li>
                 <label for="menu-1-0">week [001 ~ 006] : 리눅스 커널 내부구조 + Arm 리눅스 커널 2판</label>
                 <input type="checkbox" id="menu-1-0">
@@ -143,49 +145,49 @@
                     <li class="file">
                         <a href="">003 (2019-06-08) : 리눅스 커널 내부구조 - 5장 파일시스템과 가상 파일시스템</a>
                         <textarea readonly rows="24" cols="128">
-                            (1) 파일시스템 질문: 136p FAT 파일 중간데이터를 읽을때, 
-                                처음 블록부터 읽을 필요가없다고 나와있는데, 어떻게?
-                                - FAT파일 시스템도 "인덱스 블록 기법" 처럼 블록 위치를 테이블로 관리함.
-                                - FAT는 클러스터 단위로 파일의 데이터를 관리하여,
-                                  "클러스터 테이블" 이 "인덱스 블록" 과 같은 역할을 함.
-                                - 즉, 파일 데이터는 순서대로 클러스터 테이블로 관리하고, 
-                                  디렉토리 엔트리에서 파일의 크기를 알수있으므로 중간 데이터의 위치를 얻을 수 있음.
+                        (1) 파일시스템 질문: 136p FAT 파일 중간데이터를 읽을때, 
+                            처음 블록부터 읽을 필요가없다고 나와있는데, 어떻게?
+                            - FAT파일 시스템도 "인덱스 블록 기법" 처럼 블록 위치를 테이블로 관리함.
+                            - FAT는 클러스터 단위로 파일의 데이터를 관리하여,
+                                "클러스터 테이블" 이 "인덱스 블록" 과 같은 역할을 함.
+                            - 즉, 파일 데이터는 순서대로 클러스터 테이블로 관리하고, 
+                                디렉토리 엔트리에서 파일의 크기를 알수있으므로 중간 데이터의 위치를 얻을 수 있음.
 
-                            (2) FAT vs ext 동작방식, 슈퍼블록 구성 방식 차이
-                                - FAT의 슈퍼블록은 하나로 관리함. FAT 할당 기법으로 하나의 블록을 전체 블록으로 하여 관리함.
-                                - ext는 복수 블록 그룹 마다 관리함.
+                        (2) FAT vs ext 동작방식, 슈퍼블록 구성 방식 차이
+                            - FAT의 슈퍼블록은 하나로 관리함. FAT 할당 기법으로 하나의 블록을 전체 블록으로 하여 관리함.
+                            - ext는 복수 블록 그룹 마다 관리함.
 
-                            (3) 5장 파일시스템 : 140p i-links-count 가 사용되는 예시?
-                                - "hard link"하고 있는 다른 파일이 삭제 되어도, 원본 파일은 삭제되지 않음.
-                                - 다른 파일이 "hard link"할 때마다 "i_links_count"가 증가함.
-                                - 이 값이 '0'이 되면 삭제됨.
-                                - https://www.nongnu.org/ext2-doc/ext2.html#i-links-count
+                        (3) 5장 파일시스템 : 140p i-links-count 가 사용되는 예시?
+                            - "hard link"하고 있는 다른 파일이 삭제 되어도, 원본 파일은 삭제되지 않음.
+                            - 다른 파일이 "hard link"할 때마다 "i_links_count"가 증가함.
+                            - 이 값이 '0'이 되면 삭제됨.
+                            - https://www.nongnu.org/ext2-doc/ext2.html#i-links-count
 
-                            (4) 파일시스템 질문 (2조 seo) : Ext2 파일시스템에서 디렉토리에 속해 있는 파일 정보 얻는 방법?
-                                145p 그림5.13 설명에서, "disk block 20" 에 파일 정보가 있다는 것을 어떻게 알수 있을까?
-                                "disk block 20"의 자료구조는 어떻게 구성 되어있을까? (144p 마지막 단락 3,4번째 설명 참조)
-                                - i_mode 를 읽어서, 파일 속성이 디렉토리 이므로,
-                                  이 데이터의 시작 블록 20 은 디렉토리 엔트리 자료구조가 있음을 알 수 있음.
+                        (4) 파일시스템 질문 (2조 seo) : Ext2 파일시스템에서 디렉토리에 속해 있는 파일 정보 얻는 방법?
+                            145p 그림5.13 설명에서, "disk block 20" 에 파일 정보가 있다는 것을 어떻게 알수 있을까?
+                            "disk block 20"의 자료구조는 어떻게 구성 되어있을까? (144p 마지막 단락 3,4번째 설명 참조)
+                            - i_mode 를 읽어서, 파일 속성이 디렉토리 이므로,
+                                이 데이터의 시작 블록 20 은 디렉토리 엔트리 자료구조가 있음을 알 수 있음.
                         </textarea>
                     </li>
                     <li class="file">
                         <a href="">004 (2019-06-15) : 리눅스 커널 내부구조 - 5장 파일시스템과 가상 파일시스템, 6장 인터럽트와 트랩 그리고 시스템 호출</a>
                         <textarea readonly rows="16" cols="150">
-                            (1) 5장 파일시스템 질문(1조 이파란) : 156p sys_open() vs sys_read() 의 기능적 차이점
-                                - Functions like open() , printf() , scanf() , read() are library function 
-                                  implemented on top of their sys_* counterparts. 
-                                - so they can be used for any Application development. 
-                                - On the other hand sys_open, sys_close, sys_read etc are implemented as-part-of-system commonly known as "kernel".
-                                - https://stackoverflow.com/questions/1628540/are-programs-like-sys-open-sys-read-et-al-examples-of-system-level-progra
-                            (2) 5장 파일시스템 질문(4조, 노영진) : p151.line4, p152.line6를 보면 
-                                "파일 이름을 보고 파일을 관리하는 파일시스템이 무엇인지 판단한다"고 나와있는데,
-                                 파일 이름을 가지고 파일시스템을 어떻게 알아내는지?
-                                - where-are-filenames-stored-on-a-filesystem? See Directory Structure.
-                                - Unix directories are lists of association structures, each of which contains one filename and one inode number.
-                                - So the name of the file is stored within the directories' information structure.
-                                - https://unix.stackexchange.com/questions/117325/where-are-filenames-stored-on-a-filesystem
-                            (3) 6장 인터럽트와 트랩 그리고 시스템 호출 (1조 이파란) : 171p 트랩을 세가지로 구분하는 이유
-                                - fault trap abort의 구분은 핸들러가 수행된 이후 Return Address(eip)하고 연관됨.
+                        (1) 5장 파일시스템 질문(1조 이파란) : 156p sys_open() vs sys_read() 의 기능적 차이점
+                            - Functions like open() , printf() , scanf() , read() are library function 
+                                implemented on top of their sys_* counterparts. 
+                            - so they can be used for any Application development. 
+                            - On the other hand sys_open, sys_close, sys_read etc are implemented as-part-of-system commonly known as "kernel".
+                            - https://stackoverflow.com/questions/1628540/are-programs-like-sys-open-sys-read-et-al-examples-of-system-level-progra
+                        (2) 5장 파일시스템 질문(4조, 노영진) : p151.line4, p152.line6를 보면 
+                            "파일 이름을 보고 파일을 관리하는 파일시스템이 무엇인지 판단한다"고 나와있는데,
+                                파일 이름을 가지고 파일시스템을 어떻게 알아내는지?
+                            - where-are-filenames-stored-on-a-filesystem? See Directory Structure.
+                            - Unix directories are lists of association structures, each of which contains one filename and one inode number.
+                            - So the name of the file is stored within the directories' information structure.
+                            - https://unix.stackexchange.com/questions/117325/where-are-filenames-stored-on-a-filesystem
+                        (3) 6장 인터럽트와 트랩 그리고 시스템 호출 (1조 이파란) : 171p 트랩을 세가지로 구분하는 이유
+                            - fault trap abort의 구분은 핸들러가 수행된 이후 Return Address(eip)하고 연관됨.
                         </textarea>
                     </li>
                     <li class="file">
@@ -1150,13 +1152,13 @@
                     <li class="file">
                         <a href="">066 (2020-10-24) : mm/page_alloc.c::page_alloc_init()</a>
                         <textarea readonly rows="12" cols="100">
-                            - page_alloc_init
-                            -- page_alloc_cpu_dead
-                            --- lru_add_drain_cpu
-                            ---0 __pagevec_lru_add_fn
-        
-                            가상머신에서는 런타임 동적으로 CPU 를 바꿀 수 있음.
-                            → 해제한 CPU 와 연관된 메모리 서브시스템에 대한 동작이 필요함.
+                        - page_alloc_init
+                        -- page_alloc_cpu_dead
+                        --- lru_add_drain_cpu
+                        ---0 __pagevec_lru_add_fn
+    
+                        가상머신에서는 런타임 동적으로 CPU 를 바꿀 수 있음.
+                        → 해제한 CPU 와 연관된 메모리 서브시스템에 대한 동작이 필요함.
                         </textarea>
                         <h3>
                             순차 지향 소스 코드 분석보다는, 서브시스템 단위 Buddy System 먼저 보기로 결정함.
@@ -1287,33 +1289,33 @@
                     <li class="file">
                         <a href="">076 (2021-1-16) mm/compaction.c::isolate_migratepages()</a>
                         <textarea readonly rows="12" cols="100">
-                            - alloc_pages (include/linux/gfp.h)
-                            -- alloc_pages_current (mm/mempolicy.c)
-                            --- __alloc_pages_nodemask (mm/page_alloc.c)
-                            ---- __alloc_pages_slowpath (mm/page_alloc.c)
-                            ----- __alloc_pages_direct_compact (mm/page_alloc.c)
-                            ------ try_to_compact_pages (mm/compaction.c)
-                            ------- compact_zone_order (mm/compaction.c)  
-                            -------- compact_zone (mm/compaction.c) 
-                            --------- isolate_migratepages (mm/compaction.c) 
-                                -> 1798 isolation_suitable() 부터 볼차례 
+                        - alloc_pages (include/linux/gfp.h)
+                        -- alloc_pages_current (mm/mempolicy.c)
+                        --- __alloc_pages_nodemask (mm/page_alloc.c)
+                        ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                        ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                        ------ try_to_compact_pages (mm/compaction.c)
+                        ------- compact_zone_order (mm/compaction.c)  
+                        -------- compact_zone (mm/compaction.c) 
+                        --------- isolate_migratepages (mm/compaction.c) 
+                            -> 1798 isolation_suitable() 부터 볼차례 
                         </textarea>
                     </li>
         
                     <li class="file">
                         <a href="">077 (2021-1-23) mm/compaction.c::isolate_migratepages()</a>
                         <textarea readonly rows="14" cols="100">
-                            - alloc_pages (include/linux/gfp.h)
-                            -- alloc_pages_current (mm/mempolicy.c)
-                            --- __alloc_pages_nodemask (mm/page_alloc.c)
-                            ---- __alloc_pages_slowpath (mm/page_alloc.c)
-                            ----- __alloc_pages_direct_compact (mm/page_alloc.c)
-                            ------ try_to_compact_pages (mm/compaction.c)
-                            ------- compact_zone_order (mm/compaction.c)  
-                            -------- compact_zone (mm/compaction.c) 
-                            --------- isolate_migratepages (mm/compaction.c) 
-                            ---------- isolate_migratepages_block (mm/compaction.c) 
-                                -> 1006 isolate_fail: 부터 볼차례 (+ vmstat.c 536 mod_node_state() 정리)
+                        - alloc_pages (include/linux/gfp.h)
+                        -- alloc_pages_current (mm/mempolicy.c)
+                        --- __alloc_pages_nodemask (mm/page_alloc.c)
+                        ---- __alloc_pages_slowpath (mm/page_alloc.c)
+                        ----- __alloc_pages_direct_compact (mm/page_alloc.c)
+                        ------ try_to_compact_pages (mm/compaction.c)
+                        ------- compact_zone_order (mm/compaction.c)  
+                        -------- compact_zone (mm/compaction.c) 
+                        --------- isolate_migratepages (mm/compaction.c) 
+                        ---------- isolate_migratepages_block (mm/compaction.c) 
+                            -> 1006 isolate_fail: 부터 볼차례 (+ vmstat.c 536 mod_node_state() 정리)
                         </textarea>
                     </li>
         
@@ -1594,124 +1596,98 @@
                 <label for="menu-10">week [100 ~ ] : page reclaim</label>
                 <input type="checkbox" checked id="menu-10" />
                 <ol>
-                    <li class="file">
-                        <a href="">100 (2021-07-10) : should_continue_reclaim</a>
-                        <h5>(1) 문C</h5>
-                        <h5>
-                            <a href="http://jake.dothome.co.kr/wp-content/uploads/2016/06/alloc_pages_slowpath-1.png">__alloc_pages_slowpath() 다이어그램</a>
-                        </h5>
-                        <p>
-                            <textarea readonly rows="36" cols="128">
-                            __alloc_pages_nodemask (mm/page_alloc.c) : heart' of the zoned buddy allocator.
-                            
-                            - __alloc_pages_slowpath(alloc_mask, order, &ac) (mm/page_alloc.c)
-
-                            -- get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
-                                                    const struct alloc_context *ac) (/mm/page_alloc.c)
-                                : for_next_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx,
-                                    ac->nodemask) {
-                                        ret = node_reclaim(zone->zone_pgdat, gfp_mask, order);
-
-                            --- node_reclaim(zone->zone_pgdat, gfp_mask, order) (/mm/vmscan.c)
-
-                            ---- __node_reclaim(pgdat, gfp_mask, order) (/mm/vmscan.c)
-                                    : struct scan_control sc 설정함.
-                                    do {
-                                        shrink_node(pgdat, &sc);
-                                    } while (sc.nr_reclaimed < nr_pages && --sc.priority >= 0);
-
-                            ----- shrink_node(pgdat, &sc) (/mm/vmscan.c)
-                                    : do{ } while (should_continue_reclaim(pgdat, sc->nr_reclaimed - nr_reclaimed,
-                                                    sc->nr_scanned - nr_scanned, sc));
-                            
-                            ------ should_continue_reclaim (/mm/vmscan.c)
-
-                            /*
-                             * Reclaim/compaction is used for high-order allocation requests. It reclaims
-                             * order-0 pages before compacting the zone. should_continue_reclaim() returns
-                             * true if more pages should be reclaimed such that when the page allocator
-                             * calls try_to_compact_zone() that it will have enough free pages to succeed.
-                             * It will give up earlier than that if there is difficulty reclaiming pages.
-                             */
-                            static inline bool should_continue_reclaim(struct pglist_data *pgdat,
-                                                unsigned long nr_reclaimed,
-                                                unsigned long nr_scanned,
-                                                struct scan_control *sc)
-                            </textarea>
-                        </p>
-                        <h5>(2) 리눅스 커널의 이해 3판 : PFRA - try_to_free_pages 메모리 부족 시 회수</h5>
-                        <h5>
-                            <a href="https://github.com/torvalds/linux/commit/1742f19fa920cdd6905f0db5898524dde22ab2a4">
+                    <li>
+                        <label for="menu-10-00">100 (2021-07-10) : should_continue_reclaim</label>
+                        <input type="checkbox" id="menu-10-00" />
+                        <ol>
+                            <li class="file">
+                                <a href="">100 (2021-07-10) : should_continue_reclaim</a>
+                                <h5>(1) alloc_pages_slowpath 다이어그램</h5>
+                                <h5>
+                                    <a href="http://jake.dothome.co.kr/wp-content/uploads/2016/06/alloc_pages_slowpath-1.png">
+                                        - [문C] __alloc_pages_slowpath()
+                                    </a>
+                                </h5>
+                                <textarea readonly rows="36" cols="128">
+                                    __alloc_pages_nodemask (mm/page_alloc.c) : heart' of the zoned buddy allocator.
+                                    
+                                    - __alloc_pages_slowpath(alloc_mask, order, &ac) (mm/page_alloc.c)
+        
+                                    -- get_page_from_freelist(gfp_t gfp_mask, unsigned int order, int alloc_flags,
+                                                            const struct alloc_context *ac) (/mm/page_alloc.c)
+                                        : for_next_zone_zonelist_nodemask(zone, z, ac->zonelist, ac->high_zoneidx,
+                                            ac->nodemask) {
+                                                ret = node_reclaim(zone->zone_pgdat, gfp_mask, order);
+        
+                                    --- node_reclaim(zone->zone_pgdat, gfp_mask, order) (/mm/vmscan.c)
+        
+                                    ---- __node_reclaim(pgdat, gfp_mask, order) (/mm/vmscan.c)
+                                            : struct scan_control sc 설정함.
+                                            do {
+                                                shrink_node(pgdat, &sc);
+                                            } while (sc.nr_reclaimed < nr_pages && --sc.priority >= 0);
+        
+                                    ----- shrink_node(pgdat, &sc) (/mm/vmscan.c)
+                                            : do{ } while (should_continue_reclaim(pgdat, sc->nr_reclaimed - nr_reclaimed,
+                                                            sc->nr_scanned - nr_scanned, sc));
+                                    
+                                    ------ should_continue_reclaim (/mm/vmscan.c)
+        
+                                    /*
+                                        * Reclaim/compaction is used for high-order allocation requests. It reclaims
+                                        * order-0 pages before compacting the zone. should_continue_reclaim() returns
+                                        * true if more pages should be reclaimed such that when the page allocator
+                                        * calls try_to_compact_zone() that it will have enough free pages to succeed.
+                                        * It will give up earlier than that if there is difficulty reclaiming pages.
+                                        */
+                                    static inline bool should_continue_reclaim(struct pglist_data *pgdat,
+                                                        unsigned long nr_reclaimed,
+                                                        unsigned long nr_scanned,
+                                                        struct scan_control *sc)
+                                    </textarea>
+                                <h5>(2) 리눅스 커널의 이해 3판 : PFRA - try_to_free_pages 메모리 부족 시 회수</h5>
+                                <h5>
+                                    <a href="https://github.com/torvalds/linux/commit/1742f19fa920cdd6905f0db5898524dde22ab2a4">
+                                        - [PATCH] vmscan: rename functions
+                                    </a>
+                                </h5>
+                                <textarea readonly rows="8" cols="148">
+                                v2.6.16.62 -> v2.7.17 
+        
                                 [PATCH] vmscan: rename functions
-                            </a>
-                        </h5>
-                        <p>
-                            <textarea readonly rows="8" cols="148">
-                            v2.6.16.62 -> v2.7.17 
-
-                            [PATCH] vmscan: rename functions
-                            We have:
-                            
-                                try_to_free_pages
-                                ->shrink_caches(struct zone **zones, ..)
-                                    ->shrink_zone(struct zone *, ...)
-                                    ->shrink_cache(struct zone *, ...)
-                                        ->shrink_list(struct list_head *, ...)
-                                    ->refill_inactive_list((struct zone *, ...)
-                            
-                            which is fairly irrational.
-                            
-                            Rename things so that we have
-                            
+                                We have:
+                                
                                     try_to_free_pages
-                                    ->shrink_zones(struct zone **zones, ..)
-                                    ->shrink_zone(struct zone *, ...)
-                                        ->shrink_inactive_list(struct zone *, ...)
-                                        ->shrink_page_list(struct list_head *, ...)
-                                    ->shrink_active_list(struct zone *, ...)
-                            
-                            static void refill_inactive_zone(struct zone *zone, struct scan_control *sc)
-                            -> static void shrink_active_list(unsigned long nr_pages, struct zone *zone, struct scan_control *sc)
-                            
-
-                            # v5.1 기준 이름 변경 사항 반영 관련
-
-                            try_to_free_pages(struct zonelist *zonelist, int order, (/mm/vmscan.c)
-                                            gfp_t gfp_mask, nodemask_t *nodemask)
-                                        : struct scan_control sc 설정함.
-                            
-                            -  do_try_to_free_pages(zonelist, &sc) : (/mm/vmscan.c)
-                            -- shrink_zones(zonelist, sc) : (/mm/vmscan.c)
-                                : for_each_zone_zonelist_nodemask(zone, z, zonelist,
-                                                sc->reclaim_idx, sc->nodemask) {
-                                    shrink_node(zone->zone_pgdat, sc);
-                                                
-                            --- shrink_node(zone->zone_pgdat, sc) (/mm/vmscan.c)
-                                    : do{} while (should_continue_reclaim(pgdat, sc->nr_reclaimed - nr_reclaimed,
-                                                    sc->nr_scanned - nr_scanned, sc));
-                            ---- shrink_node_memcg(pgdat, memcg, sc, &lru_pages);
-                                    : for_each_evictable_lru(lru) {
-                                        nr_reclaimed += shrink_list(lru, nr_to_scan, lruvec, sc);
-                            
-                            ----- shrink_list(lru, nr_to_scan, lruvec, sc) (/mm/vmscan.c)
-                                    : return shrink_inactive_list(nr_to_scan, lruvec, sc, lru);
-                            
-                            ------ shrink_active_list(nr_to_scan, lruvec, sc, lru) (/mm/vmscan.c)
-                                    : a helper for shrink_node(). It returns the number of reclaimed pages
-                            
-                            ------- shrink_page_list(&page_list, pgdat, sc, 0, &stat, false) (/mm/vmscan.c)
-                                    : returns the number of reclaimed pages
-                            
-                            ----- shrink_inactive_list(nr_to_scan, lruvec, sc, lru);
-                                    : a helper for shrink_node().  It returns the number of reclaimed pages
-                            </textarea>
-                            <h5>(3) v5.1 기준 이름 변경 사항 반영 관련</h5>
-                            <h5>
-                                <a href="http://jake.dothome.co.kr/zonned-allocator-shrink-1/">
-                                    문c - zonned-allocator-shrink-1
-                                </a>
-                            </h5>
-                            <textarea readonly rows="8" cols="148">      
+                                    ->shrink_caches(struct zone **zones, ..)
+                                        ->shrink_zone(struct zone *, ...)
+                                        ->shrink_cache(struct zone *, ...)
+                                            ->shrink_list(struct list_head *, ...)
+                                        ->refill_inactive_list((struct zone *, ...)
+                                
+                                which is fairly irrational.
+                                
+                                Rename things so that we have
+                                
+                                        try_to_free_pages
+                                        ->shrink_zones(struct zone **zones, ..)
+                                        ->shrink_zone(struct zone *, ...)
+                                            ->shrink_inactive_list(struct zone *, ...)
+                                            ->shrink_page_list(struct list_head *, ...)
+                                        ->shrink_active_list(struct zone *, ...)
+                                
+                                static void refill_inactive_zone(struct zone *zone, struct scan_control *sc)
+                                -> static void shrink_active_list(unsigned long nr_pages, struct zone *zone, struct scan_control *sc)
+                                </textarea>
+        
+                                <h5>(3) (v2.6.11) VS (v5.1) 기준 이름 변경 관련</h5>
+        
+                                <h5>
+                                    <a href="http://jake.dothome.co.kr/zonned-allocator-shrink-1/">
+                                        - [문c] zonned-allocator-shrink-1
+                                    </a>
+                                </h5>
+        
+                                <textarea readonly rows="8" cols="148">      
                                 try_to_free_pages(struct zonelist *zonelist, int order, (/mm/vmscan.c)
                                                 gfp_t gfp_mask, nodemask_t *nodemask)
                                             : struct scan_control sc 설정함.
@@ -1741,7 +1717,54 @@
                                 ----- shrink_inactive_list(nr_to_scan, lruvec, sc, lru);
                                         : a helper for shrink_node().  It returns the number of reclaimed pages
                                 </textarea>
-                        </p>
+                            </li>
+                                
+                        </ol>
+                    </li>
+
+                    <li>
+                        <label for="menu-10-01">101 (2021-07-17) : v2.6.11 mm/vmscan.c::refill_inactive_zone</label>
+                        <input type="checkbox" id="menu-10-01" checked/>
+                        <ol>
+                            <li class="file">
+                                <a href="https://elixir.bootlin.com/linux/v2.6.11/source/mm/vmscan.c#L638">101 (2021-07-17) : refill_inactive_zone - 100주차 내용 (스터디 휴가임)</a>
+                                <textarea readonly rows="32" cols="150">
+                                # 진도
+                                shrink_zone(struct zone *zone, struct scan_control *sc) (mm/vmscan.c)
+                                - refill_inactive_zone (mm/vmscan.c) (struct zone *zone, struct scan_control *sc)
+
+                                while (pgscanned < nr_pages && !list_empty(&zone->active_list)) 까지 봤음.
+
+                                @ nr_active || nr_inactive 가 존재할 때, SWAP_CLUSTER_MAX 단위로 배치 처리
+
+                                @ mm/swap.c::lru_add_drain, include/linux/pagevec.h::struct pagevec 공부
+                                - __pagevec_lru_add(struct pagevec *pvec)
+                                -- add_page_to_inactive_list(struct zone *zone, struct page *page)
+                                - percpu 변수로 lru 캐시된 페이지를 zone inactive / acive_list 넣음
+                                - https://elixir.bootlin.com/linux/v2.6.11/source/include/linux/mm_inline.h#L10
+
+                                @ 리스트 멤버를 가진 해당 구조체를 가져옴.
+                                #define lru_to_page(_head) (list_entry((_head)->prev, struct page, lru))
+                                /**
+                                 * list_entry - get the struct for this entry
+                                 * @ptr:	the &struct list_head pointer.
+                                 * @type:	the type of the struct this is embedded in.
+                                 * @member:	the name of the list_struct within the struct.
+                                 */
+                                #define list_entry(ptr, type, member) \
+                                    container_of(ptr, type, member)
+
+                                @ prefetch_prev_lru_page 에서 page 구조체에 멤버인 LIST_HEAD 구조에 따른 if ((_page)->lru.prev != _base) 예외 처리
+
+                                @ refill_inactive_zone 네이밍은 이후 변경함.
+                                static void refill_inactive_zone
+                                -> static void shrink_active_list
+                                </textarea>
+                            </li>
+                            <li class="file">
+                                <a href="">102 (2021-07-24) : refill_inactive_zone 이어서</a>
+                            </li>
+                        </ol>
                     </li>
                 </ol>
             </li>
@@ -1764,13 +1787,17 @@
 <script>
 
 function getPng() {
-    const body = document.body;
-    html2img(body, 800, 600, 800, 600);
+    const dom = document.getElementById("container");
+    html2img(dom);
 }
 
-function html2img(html, x, y, w, h) {
+function html2img(dom) {
+    const html = dom.innerHTML;
     const xml = html2xml(html);
+    
     const vXml = xml.replace(/\#/g, '%23');
+    const w = dom.offsetWidth;
+    const h = dom.offsetHeight;
     const svg = `data:image/svg+xml;charset=utf-8,<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
         <foreignObject width="100%" height="100%">${vXml}</foreignObject></svg>`;
 
@@ -1778,9 +1805,8 @@ function html2img(html, x, y, w, h) {
     img.onload = () => {
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext("2d");
-        ctx.drawImage(img, x, y);
+        ctx.drawImage(img, w, h);
         canvas2png(canvas);
-        canvas.delete();
     };
     img.src = svg;
 }
@@ -1803,42 +1829,36 @@ async function canvas2png(canvas) {
     link.download = `study-log-tree.png`;
     link.href = canvas.toDataURL();
     link.click();
-    link.delete();
 }
 
 </script>
 
 <style>
-* {
-    margin: 0;
-    padding:0;
+
+#container {
+    border: 4px ridge;
+    overflow: auto;
+    min-width: calc(98vw - 4px);
+    min-height: 80vh;
+    max-height: 80vh;
 }
-
-body {
-    padding: 1%;
-}
-
-input { font-size: 1em; }
-
-ol.tree { padding: 2%; }
 
 li {
     list-style-type: none;
     position: relative;
-    margin-left: -15px;
 }
 
 li label {
     white-space: nowrap;
-    padding-left: 37px;
+    padding-left: 36px;
     cursor: pointer;
     background: url('https://api.iconify.design/mdi:folder-outline.svg') no-repeat 15px 2px;
-    display: block;
 }
 
 li input {
     position: absolute;
     top: 0;
+    margin-left: 0;
     opacity: 0;
     cursor:pointer;
 }
@@ -1852,11 +1872,11 @@ li input + ol {
 li input + ol > li {
     display: none;
     margin-left: -14px !important;
-    padding-left:1px;
+    padding-left: 1px;
 }
 
 li.file {
-    margin-left:-1px !important;
+    margin-left: -1px !important;
 }
 
 li.file > a {
@@ -1864,22 +1884,17 @@ li.file > a {
     margin-top: 8px;
     padding-left: 21px;
     text-decoration: none;
-    background: url('https://api.iconify.design/mdi:file-document-outline.svg') no-repeat 0 0;
+    background: url('https://api.iconify.design/mdi:file-document-outline.svg') no-repeat;
 }
 
 li input:checked + ol {
     height: auto;
-    margin: -24px 0 0 -44px;
-    padding: 25px 0 0 80px;
     background: url('https://api.iconify.design/mdi:minus-box-outline.svg') no-repeat 40px 5px;
 }
 
 li input:checked + ol > li {
     display: block;
-    margin:0 0 0.063em;
 }
-
-li input:checked + ol > li:first-child { margin: 0 0 0.125em; }
 
 textarea {
     display: block;
@@ -1887,11 +1902,7 @@ textarea {
     resize: none;
 }
 
-.pl-1 { padding-left: 32px; }
-
 .fs-8 { font-size: 8px; }
-
-.fs-4 { font-size: 4px; }
 
 </style>
 
