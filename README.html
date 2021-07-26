@@ -1875,7 +1875,7 @@
                         <ol>
                             <li class="file">
                                 <a href="">102 (2021-07-24) : shrink_zone->shrink_list();</a>
-                                <textarea readonly rows="128" cols="150">
+                                <textarea readonly rows="120" cols="150">
                                 # 진도
                                 shrink_zone(struct zone *zone, struct scan_control *sc) (mm/vmscan.c)
                                 - refill_inactive_zone (mm/vmscan.c) (struct zone *zone, struct scan_control *sc)
@@ -1883,8 +1883,9 @@
                                 -- get_page_testone(page)
                                 --- __put_page(page);
                                 -- shrink_list(struct list_head *page_list, struct scan_control *sc)
-                                -- try_to_unmap(page)
+                                --- try_to_unmap(page)
                                 --- __delete_from_swap_cache(struct page *page)
+                                ---- radix_tree_delete(&swapper_space.page_tree, page->private);
                                 --- swap_free(swp_entry_t entry)
                                 ---- swap_info_get(entry);
 
