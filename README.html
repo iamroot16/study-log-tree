@@ -1770,7 +1770,7 @@
                         <ol>
                             <li class="file">
                                 <a href="">102 (2021-07-24) : shrink_zone->shrink_list();</a>
-                                <textarea readonly rows="120" cols="150">
+                                <textarea readonly rows="112" cols="150">
                                 # 진도
                                 shrink_zone(struct zone *zone, struct scan_control *sc) (mm/vmscan.c)
                                 - refill_inactive_zone (mm/vmscan.c) (struct zone *zone, struct scan_control *sc)
@@ -1873,7 +1873,6 @@
                                     - delete_from_swap_cache(page);
                                     + 스왑 엔트리가 50% 이상 사용중일 때도 스왑 캐시에서 제거함
                                 </textarea>
-                                <a href="">103 (2021-07-31) : </a>
                             </li>
                         </ol>
                     </li>
@@ -1960,7 +1959,7 @@ async function canvas2png(canvas) {
 #container {
     border: 4px ridge;
     overflow: auto;
-    min-width: calc(98vw - 4px);
+    min-width: 1280px;
     min-height: 80vh;
     max-height: 80vh;
 }
