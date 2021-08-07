@@ -1766,11 +1766,11 @@
 
                     <li>
                         <label for="menu-10-02">102 (2021-07-24) : v2.6.11 mm/vmscan.c::shrink_list()</label>
-                        <input type="checkbox" id="menu-10-02" checked/>
+                        <input type="checkbox" id="menu-10-02"/>
                         <ol>
                             <li class="file">
                                 <a href="">102 (2021-07-24) : shrink_zone->shrink_list();</a>
-                                <textarea readonly rows="112" cols="150">
+                                <textarea readonly rows="102" cols="150">
                                 # 진도
                                 shrink_zone(struct zone *zone, struct scan_control *sc) (mm/vmscan.c)
                                 - refill_inactive_zone (mm/vmscan.c) (struct zone *zone, struct scan_control *sc)
@@ -1841,6 +1841,7 @@
                                     do_swap_page()
                                     - lookup_swap_cache()
 
+                                    [ (e) -> (d) 일 경우 ]
                                     do_swap_page()
                                     - read_swap_cache_async()
                                     -- add_to_swap_cache()
@@ -1878,11 +1879,156 @@
                     </li>
                     
                     <li>
-                        <label for="menu-10-03">103 (2021-07-31) : </label>
+                        <label for="menu-10-03">103 (2021-07-31) : v5.1 mm/vmscan.c::shrink_page_list()</label>
                         <input type="checkbox" id="menu-10-03" checked/>
                         <ol>
                             <li class="file">
-                                <a href="">103 (2021-07-31) : </a>
+                                <a href="">103 (2021-07-31) : v5.1 mm/vmscan.c::shrink_page_list()</a>
+                                <textarea readonly rows="100" cols="150">
+                                # ULK 버전 shirink_list() 마무리
+
+                                @ do_swap_page()
+                                - read_swap() -> get_swap_bio() -> struct bio -> submmit_bio(READ or WRITE, bio)
+                                
+                                @ mm 락 처리 루틴
+                                - &mapping->tree_lock 에 대한 락과 page 에 대한 락 비교
+                                
+                                (1) rmap.c 처음 릴리즈 v2.5.27
+                                
+                                https://elixir.bootlin.com/linux/v2.5.27/source/mm/rmap.c#L14
+                                
+                                /*
+                                * Locking:
+                                * - the page->pte.chain is protected by the PG_chainlock bit,
+                                *   which nests within the pagemap_lru_lock, then the
+                                *   mm->page_table_lock, and then the page lock.
+                                * - because swapout locking is opposite to the locking order
+                                *   in the page fault path, the swapout path uses trylocks
+                                *   on the mm->page_table_lock
+                                */
+                                
+                                (2) ULK 버전 v2.6.11
+                                
+                                https://elixir.bootlin.com/linux/v2.6.11/source/mm/rmap.c#L14
+                                    
+                                /*
+                                * Lock ordering in mm:
+                                *
+                                * inode->i_sem	(while writing or truncating, not reading or faulting)
+                                *   inode->i_alloc_sem
+                                *
+                                * When a page fault occurs in writing from user to file, down_read
+                                * of mmap_sem nests within i_sem; in sys_msync, i_sem nests within
+                                * down_read of mmap_sem; i_sem and down_write of mmap_sem are never
+                                * taken together; in truncation, i_sem is taken outermost.
+                                *
+                                * mm->mmap_sem
+                                *   page->flags PG_locked (lock_page)
+                                *     mapping->i_mmap_lock
+                                *       anon_vma->lock
+                                *         mm->page_table_lock
+                                *           zone->lru_lock (in mark_page_accessed)
+                                *           swap_list_lock (in swap_free etc's swap_info_get)
+                                *             mmlist_lock (in mmput, drain_mmlist and others)
+                                *             swap_device_lock (in swap_duplicate, swap_info_get)
+                                *             mapping->private_lock (in __set_page_dirty_buffers)
+                                *             inode_lock (in set_page_dirty's __mark_inode_dirty)
+                                *               sb_lock (within inode_lock in fs/fs-writeback.c)
+                                *               mapping->tree_lock (widely used, in set_page_dirty,
+                                *                         in arch-dependent flush_dcache_mmap_lock,
+                                *                         within inode_lock in __sync_single_inode)
+                                */
+                                    
+                                (3) v5.1 기준
+                                    
+                                https://elixir.bootlin.com/linux/v5.1/source/mm/rmap.c#L20
+                                
+                                /*
+                                * Lock ordering in mm:
+                                *
+                                * inode->i_mutex	(while writing or truncating, not reading or faulting)
+                                *   mm->mmap_sem
+                                *     page->flags PG_locked (lock_page)
+                                *       hugetlbfs_i_mmap_rwsem_key (in huge_pmd_share)
+                                *         mapping->i_mmap_rwsem
+                                *           anon_vma->rwsem
+                                *             mm->page_table_lock or pte_lock
+                                *               pgdat->lru_lock (in mark_page_accessed, isolate_lru_page)
+                                *               swap_lock (in swap_duplicate, swap_info_get)
+                                *                 mmlist_lock (in mmput, drain_mmlist and others)
+                                *                 mapping->private_lock (in __set_page_dirty_buffers)
+                                *                   mem_cgroup_{begin,end}_page_stat (memcg->move_lock)
+                                *                     i_pages lock (widely used)
+                                *                 inode->i_lock (in set_page_dirty's __mark_inode_dirty)
+                                *                 bdi.wb->list_lock (in set_page_dirty's __mark_inode_dirty)
+                                *                   sb_lock (within inode_lock in fs/fs-writeback.c)
+                                *                   i_pages lock (widely used, in set_page_dirty,
+                                *                             in arch-dependent flush_dcache_mmap_lock,
+                                *                             within bdi.wb->list_lock in __sync_single_inode)
+                                *
+                                * anon_vma->rwsem,mapping->i_mutex      (memory_failure, collect_procs_anon)
+                                *   ->tasklist_lock
+                                *     pte map lock
+                                */
+                                    
+                                @try_to_release() 부분 버퍼 페이지 처리
+                                -  디스크 정보에 대한 캐시 정리 필요
+                                -  private -> 버퍼를 가지고 있음.
+                                    
+                                # v5.1 mm/vmscan.c::shrink_page_list()
+                                - UKL 기준 shirink_list() 가 하던 동작을 v5.1 에서 하고 있음.
+                                
+                                @ swap_info_struct 멤버인 swap_cluster_info : SSD 를 위해 추가한 멤버
+                                https://github.com/iamroot16/linux/commit/2a8f9449343260373398d59228a62a4332ea513a 
+                                
+                                @ recliam 몸통 부분을 보면서 정리
+                                while (!list_empty(page_list))
+                                    -> page = lru_to_page(page_list); // 리스트 멤버의 콘테이너 페이지 디스크립터
+                                    -> if (!trylock_page(page))
+                                    -> page = compound_head(page); 
+                                    
+                                @ compound_page 복습 
+                                [PATCH] mm: make compound_head() robust
+                                    - 주소 비트가 4, 8 바이트 단위로 align 되는 특성을 이용한 사파의 기술
+                                    - https://github.com/iamroot16/linux/commit/1d798ca3f16437c71ff63e36597ff07f9c12e4d6
+                                    - 참고 : http://jake.dothome.co.kr/compound/
+                                    
+                                @ sc->nr_scanned++; // related with vmppressure @ shrink_node
+                                    
+                                @ BDI : Backing Device INFO (such as HDD, Flash memory...)
+                                - inode_write_congested(mapping->host) 
+                                    : write가 혼잡한 상태
+                                    - (writeback && PageReclaim(page))
+                                    : writeback을 통해 회수를 진행함
+                                
+                                @ a page at the tail of the LRU is under writeback
+                                - 고려할 3 가지의 경우 정리
+                                    https://elixir.bootlin.com/linux/v5.1/source/mm/vmscan.c#L1172
+                                </textarea>
+                            </li>
+                        </ol>
+                    </li>
+                    
+                    <li>
+                        <label for="menu-10-04">104 (2021-08-07) : </label>
+                        <input type="checkbox" id="menu-10-04"/>
+                        <ol>
+                            <li class="file">
+                                <a href="">104 (2021-08-07) : </a>
+                                <textarea readonly>
+                                </textarea>
+                            </li>
+                        </ol>
+                    </li>
+
+                    <li>
+                        <label for="menu-10-05">105 (2021-08-14) : </label>
+                        <input type="checkbox" id="menu-10-05"/>
+                        <ol>
+                            <li class="file">
+                                <a href="">105 (2021-08-14) : </a>
+                                <textarea readonly>
+                                </textarea>
                             </li>
                         </ol>
                     </li>
