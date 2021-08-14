@@ -2011,11 +2011,11 @@
                     
                     <li>
                         <label for="menu-10-04">104 (2021-08-07) : v5.1 mm/vmscan.c::shrink_page_list()</label>
-                        <input type="checkbox" id="menu-10-04" checked/>
+                        <input type="checkbox" id="menu-10-04"/>
                         <ol>
                             <li class="file">
                                 <a href="">104 (2021-08-07) : v5.1 mm/vmscan.c::shrink_page_list()</a>
-                                <textarea readonly rows="24" cols="90">
+                                <textarea readonly rows="24" cols="100">
                                 v5.1 mm/vmscan.c::shrink_page_list() 마무리
 
                                 split_huge_page_to_list()
@@ -2042,17 +2042,197 @@
                     </li>
 
                     <li>
-                        <label for="menu-10-05">105 (2021-08-14) : </label>
-                        <input type="checkbox" id="menu-10-05"/>
+                        <label for="menu-10-05">105 (2021-08-14) : swap, direct migration & LRU</label>
+                        <input type="checkbox" id="menu-10-05" checked/>
                         <ol>
                             <li class="file">
-                                <a href="">105 (2021-08-14) : </a>
-                                <textarea readonly>
+                                <a href="">105 (2021-08-14) : swap, direct migration & LRU</a>
+                                <textarea readonly rows="160" cols="180">
+                                1. LRU & pagevec v2.6.11 복습
+                                (1) 어떻게 pagevec 을 채울까? -> lru_cache_add()
+                                    - 각 percpu 변수로 lru_add_pvecs
+                                        lru_add_active_pvecs 가 있음
+                                        pagevec 이 가득차면 pagevec 을 zone->lru list 로 넘겨주면서 flush 함.
+                                
+                                (2) 어떻게 pagevec 을 비울까?
+                                
+                                release_pages()
+                                __pagevec_lru_drain()
+                                - mm/swap.c::release_pages()
+                                
+                                    - pagevec 을 release 함!
+                                    - LRU pagevec 에서 놔주지 않아서
+                                    - reference_cnt 를 감소함. reference_cnt 0 이면 제거함
+                                
+                                    해당 페이지는 아무도 사용하지 않을 때
+                                    __pagevec_free()
+                                
+                                    - (1) lru flag 를 지움
+                                    - (2) pagevec_add 는 남는 여유공간을 리턴함.
+                                    해당 페이지를 사용하지 않는데, LRU 에 넣으면 이상함!
+                                    왜냐하면, LRU 는 사용하고 있는 메모리를 관리하는 자료구조임!
+                                
+                                    static inline unsigned pagevec_space(struct pagevec *pvec)
+                                    {
+                                        return PAGEVEC_SIZE - pvec->nr;
+                                    }
+                                
+                                    /*
+                                    * Add a page to a pagevec.  Returns the number of slots still available.
+                                    */
+                                    static inline unsigned pagevec_add(struct pagevec *pvec, struct page *page)
+                                    {
+                                    pvec->pages[pvec->nr++] = page;
+                                        return pagevec_space(pvec);
+                                    }
+                                
+                                    if (!pagevec_add(&pages_to_free, page)) { ... }
+                                
+                                    pagevec 사이즈가 꽉 찼을 때 동작임.
+                                
+                                2. reference_cnt
+                                    page_cache_get() 에서 reference_cnt 증가함
+                                    PFRA 에서 reclaim 에서 1 증가하므로, put_page_testzero() 를 통과하지 못하여,
+                                    아래 pagevec_free 를 하지 못함!
+                                
+                                3. [PATCH] Swap Migration V5: LRU operations - Christoph Lameter v2.6.15
+                                
+                                (1) This is the start of the `swap migration' patch series.
+                                    - https://github.com/iamroot16/linux/commit/21eac81f252fe31c3cf64b805a1e8652192f3a3b
+                                
+                                    가상메모리는 그대로, 메모리 접근을 빨리할 수 있도록,
+                                    누마 노드에 맞춰서 물리 페이지를 옮겨줌!
+                                
+                                    This breaks out isolate_lru_page() and putpack_lru_page()
+                                
+                                    numa mem policy?
+                                
+                                (2) migrate_pages() 함수를 추가함
+                                    - https://github.com/iamroot16/linux/commit/49d2e9cc4544369635cd6f4ef6d5bb0f757079a7
+                                
+                                This adds the basic page migration function with a minimal implementation that
+                                only allows the eviction of pages to swap space.
+                                
+                                shrink_page_list() 와 거의 동일함!
+                                
+                                int migrate_pages(struct list_head *l, struct list_head *t)
+                                    -> if (PageAnon(page) && !PageSwapCache(page)) -> add_to_swap(page)
+                                    -> static int swap_page(struct page *page)
+                                            struct address_space *mapping = page_mapping(page);
+                                        -> try_to_unmap(page)
+                                        -> if(PageDirty(page)) -> pageout(page, mapping) // swap out!
+                                        -> if (PagePrivate(page)) -> try_to_release_page(page, GFP_KERNEL)
+                                        -> remove_mapping(mapping, page)
+                                            -> if (PageSwapCache(page)) -> swap_free(swap);
+                                            -> __remove_from_page_cache(page);
+                                
+                                4. Direct Migration - Christoph Lameter v2.6.16-rc2
+                                - numa migration, memory hotplug 을 지원하는게 동기임
+                                - swap migration 이랑 비슷한 컨셉임
+                                
+                                (1) Add direct migration support with fall back to swap. 
+                                        - https://github.com/iamroot16/linux/commit/a48d07afdf18212de22b959715b16793c5a6e57a
+                                
+                                    @ int migrate_page(struct page *newpage, struct page *page)
+                                        - swap cache 에서 페이지를 가져온 다음 newpage 에 매핑함!
+                                
+                                    @ void migrate_page_copy(struct page *newpage, struct page *page)
+                                        - flag 설정까지 복붙함
+                                
+                                    * Pages are locked upon entry and exit.
+                                        migrate_page_remove_references()
+                                            - try_to_unmap() vs 다른 프로세서를 통해서 do_swap_page()
+                                            - do_swap_page() 에서도 lock_page() 를 함! /* Page migration has occured */
+                                            - address_space 맵이 락으로 보호되는 구간임
+                                            : write_lock_irq(&mapping->tree_lock); ~ write_unlock_irq(&mapping->tree_lock);
+                                
+                                    @ migrate_pages()
+                                        - page 에 락은 입장 rc = migrate_page(newpage, page); 퇴장동안 걸리고 이후
+                                        - 서로 다른 프로세스가 병행적으로 각 각을 진행할 때 시나리오를 고려해보면,
+                                            ├─ migrate_pages() -> unlock_page:
+                                                    unlock_page(page);
+                                            ...    
+                                            ├─ do_swap_page() -> lock_page(page) -> if(!PageSwapCache(page)) /* Page migration has occured */
+                                            ...
+
+                                5.  Split LRU page replacement design - Rik van Riel, Lee Schermerhorn, Kosaki Motohiro
+                                - lru 는 V2.6.28 이전에는 active 하나 inactive 하나씩, 파일과 anon 페이지를 같이 관리함. 
+                                    ex: 128GB 메모리, 스캔 속도 ⬇
+                                - lru 는 V2.6.28 이gn에는 파일 & anon 페이지에 대해 active & inactive 각 각 따로 관리함.
+                                    스캔 속도 ⬆
+                                - https://linux-mm.org/PageReplacementDesign
+                                - https://linux-mm.org/ProblemWorkloads
+                                - https://linux-mm.org/PageReplacementRequirements
+                                - https://lwn.net/Articles/147879/
+                                    - CLOCK-Pro :
+                                            비활성 목록의 페이지가 활성 목록의 페이지보다 덜 자주 참조되도록 합니다. 
+                                            따라서 [액세스 다이어그램]특정 페이지가 애플리케이션에서 거의 사용되지 않는 경우에도,
+                                            가장 최근에 액세스한 페이지에 우선 순위를 지정하는 LRU 방식 과 다릅니다.
+
+                                LRU 참고: 
+                                (1) ULK : LRU pagevec 그림 네모 4개
+                                (2) https://pr0gr4m.tistory.com/entry/Linux-Kernel-5-LRU-Memory-Reclaim
+                                
+                                6. [PATCH] swap: use an array for the LRU pagevecs
+                                - 복붙 코드를 LRU 배열로 리팩토링함
+                                - https://github.com/iamroot16/linux/commit/f04e9ebbe4909f9a41efd55149bc353299f4e83b
+
+                                7. [PATCH] define page_file_cache() function
+                                - PG_swapbacked 도입함
+                                - 익명페이지를 설정하는 부분에는 PageSwapBacked(page) 관련 확인이 있음!
+                                - https://github.com/iamroot16/linux/commit/b2e185384f534781fd22f5ce170b2ad26f97df70
+
+                                8. [PATCH] vmscan: split LRU lists into anon & file sets
+                                - mmzone.h 쪽에 /* Second 128 byte cacheline */ 캐시 라인 관련 패치가 있음.
+                                - https://github.com/iamroot16/linux/commit/4f98a2fee8acdb4ac84545df98cccecfd130f8db
+                                
+                                9. [PATCH] vmscan: second chance replacement for anonymous pages
+                                - active:inactive ratio = sqrt(memory in GB * 10).
+                                - linux-mm PageReplacementDesign 에 anon page 항목의 구현사항이 들어가 있음!
+                                - 추가로 active : inactive 메인메모리를 root sqaure raio 산식을 사용함!
+                                - https://github.com/iamroot16/linux/commit/556adecba110bf5f1db6c6b56416cfab5bcab698
+
+                                # [PATCH] per-zone and reclaim enhancements for memory controller: add scan_global_lru macro
+                                - scan_global_lru(sc) : scan_control 로 global lru 을 스캔할 지 mem_cgroup lru 할 지 정함.
+                                - https://git.kernel.org/pub/scm/linux/kernel/git/history/history.git/commit/mm/vmscan.c?h=v2.6.25-rc1&id=91a45470f7ddc322073752e711a2e8dcbc339e6f
+
+                                10. [PATCH] Unevictable LRU Infrastructure
+                                - kernel 이 wrong pages를 evicts 하면, 성능이 굉장히 안좋아지므로 이를 방지함.
+                                - https://github.com/iamroot16/linux/commit/894bc310419ac95f4fa4142dc364401a7e607f65
+
+                                11. [PATCH] unevictable lru: add event counting with statistics
+                                - https://github.com/iamroot16/linux/commit/bbfd28eee9fbd73e780b19beb3dc562befbb94fa
                                 </textarea>
                             </li>
                         </ol>
                     </li>
-                    
+
+                    <li>
+                        <label for="menu-10-06">106 (2021-08-21) : </label>
+                        <input type="checkbox" id="menu-10-06"/>
+                        <ol>
+                            <li class="file">
+                                <a href="">106 (2021-08-21) : </a>
+                                <textarea readonly>
+                                    
+                                </textarea>
+                            </li>
+                        </ol>
+                    </li>
+
+                    <li>
+                        <label for="menu-10-07">107 (2021-08-28) : </label>
+                        <input type="checkbox" id="menu-10-07"/>
+                        <ol>
+                            <li class="file">
+                                <a href="">107 (2021-08-28) : </a>
+                                <textarea readonly>
+                                    
+                                </textarea>
+                            </li>
+                        </ol>
+                    </li>
+
                 </ol>
             </li>
             
