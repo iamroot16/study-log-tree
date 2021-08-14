@@ -1880,7 +1880,7 @@
                     
                     <li>
                         <label for="menu-10-03">103 (2021-07-31) : v5.1 mm/vmscan.c::shrink_page_list()</label>
-                        <input type="checkbox" id="menu-10-03" checked/>
+                        <input type="checkbox" id="menu-10-03"/>
                         <ol>
                             <li class="file">
                                 <a href="">103 (2021-07-31) : v5.1 mm/vmscan.c::shrink_page_list()</a>
@@ -1981,7 +1981,7 @@
                                 @ swap_info_struct 멤버인 swap_cluster_info : SSD 를 위해 추가한 멤버
                                 https://github.com/iamroot16/linux/commit/2a8f9449343260373398d59228a62a4332ea513a 
                                 
-                                @ recliam 몸통 부분을 보면서 정리
+                                @ reclaim 몸통 부분을 보면서 정리
                                 while (!list_empty(page_list))
                                     -> page = lru_to_page(page_list); // 리스트 멤버의 콘테이너 페이지 디스크립터
                                     -> if (!trylock_page(page))
@@ -2010,12 +2010,32 @@
                     </li>
                     
                     <li>
-                        <label for="menu-10-04">104 (2021-08-07) : </label>
-                        <input type="checkbox" id="menu-10-04"/>
+                        <label for="menu-10-04">104 (2021-08-07) : v5.1 mm/vmscan.c::shrink_page_list()</label>
+                        <input type="checkbox" id="menu-10-04" checked/>
                         <ol>
                             <li class="file">
-                                <a href="">104 (2021-08-07) : </a>
-                                <textarea readonly>
+                                <a href="">104 (2021-08-07) : v5.1 mm/vmscan.c::shrink_page_list()</a>
+                                <textarea readonly rows="22" cols="80">
+                                v5.1 mm/vmscan.c::shrink_page_list() 마무리
+
+                                split_huge_page_to_list()
+                                : thp인 경우 split이 불가능하면 activate_locked 레이블로 이동시키고,
+                                페이지를 split한 order 0 페이지들을 page_list에 추가하고 activate_locked 레이블로 이동한다.
+                                compound_page가 매핑되지 않은 경우에만, 각각의 페이지로 split 함.
+
+                                https://elixir.bootlin.com/linux/v2.5.51/source/include/linux/page-flags.h#L244
+
+                                #define PageReclaim(page)	test_bit(PG_reclaim, &(page)->flags)
+                                #define SetPageReclaim(page)	set_bit(PG_reclaim, &(page)->flags)
+
+                                PG_reclaim,		/* To be reclaimed asap */
+                                asap : As soon as possible
+
+                                clean anon:
+                                - PageAnon(page) && !PageSwapBacked(page)
+                                
+                                enum pgdat_flags.PGDAT_DIRTY                                
+                                - reclaim scanning has recently found many dirty file pages at the tail of the LRU.
                                 </textarea>
                             </li>
                         </ol>
