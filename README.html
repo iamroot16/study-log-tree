@@ -2209,12 +2209,138 @@
 
                     <li>
                         <label for="menu-10-06">106 (2021-08-21) : </label>
-                        <input type="checkbox" id="menu-10-06"/>
+                        <input type="checkbox" id="menu-10-06" checked/>
                         <ol>
                             <li class="file">
                                 <a href="">106 (2021-08-21) : </a>
-                                <textarea readonly>
+                                <textarea readonly rows="130" cols="180">
+                                10 ~ 11. evitable 패치 다시한번 보기
+                                
+                                #ifdef CONFIG_UNEVICTABLE_LRU
+                                void putback_lru_page(struct page *page)
+                                
+                                @ unevictable -> reclaim 스캔 대상이 아님!
+                                    evictable page 가 unevictable LRU list 에 있으면, free 가 안됨!!
+                                    - 왜 free가 안될까?
+                                        -> reclaim 대상이 아님!
+                                        -> 스캔 대상이 아니라 회수가 안됨.
+                                
+                                        if (lru == LRU_UNEVICTABLE && page_evictable(page, NULL)) {
+                                        if (!isolate_lru_page(page)) {
+                                            put_page(page);
+                                    -> isolate_lru_page(page) 성공하면 
+                                                LRU 에 속해있다는 플래그를 지움!
+                                        -> redo: ClearPageUnevictable(page);
+                                        -> if (page_evictable(page, NULL)) -> lru_cache_add_lru(page, lru);
+                                                - This way, we avoid "stranding" evictable pages on the unevictable list.
+                                
+                                
+                                락을 걸지 않고 왜 이렇게 했을까?
+                                LRU 락?
+                                
+                                returns 0 on success, -ve errno on failure.
+                                isolate_lru_page(page) -> ClearPageLRU(page);
+                                
+                                put_page(page)
+                                -> 리퍼런스 카운트를 내림
+                                
+                                
+                                    * add_page_to_unevictable_list - add a page to the unevictable list
+                                    * @page:  the page to be added to the unevictable list
+                                
+                                void add_page_to_unevictable_list(struct page *page);
+                                
+                                
+                                @ insert to unevictable
+                                    - evictable -> unevictable
+                                #ifdef CONFIG_UNEVICTABLE_LRU
+                                void putback_lru_page(struct page *page)
+                                if (page_evictable(page, NULL)) -> add_page_to_unevictable_list(page);
+                                
+                                @ delte from unevictable
+                                    - unevictable -> evictable
+                                    - moving the page from non-evictable to evictable state
+                                
+                                @ 페이지를 undevictable 로 바꿈!
+                                void lru_cache_add_lru(struct page *page, enum lru_list lru)
+                                    if(PageUnevictable(page)) -> ClearPageUnevictable(page);
+                                
+                                12. [PATCH] mlock: mlocked pages are unevictable - Nick Piggin
+                                    - https://github.com/iamroot16/linux/commit/b291f000393f5a0b679012b39d79fbc85c018233
+                                
+                                    - mlock 한 페이지는 unevictable 함!
+                                
+                                    - 4가지 전략으로 할 수 있음!
+                                    fault path 가 뭘까?
+                                
+                                    (1) PG_mlocked 로 fault path에 대한 vmscan 성능을 효과적으로 함!
+                                    - unevictable pages 들에 대해서 page_referenced()/try_to_unmap() 실행하는 것을 방지함!
+                                
+                                    (2) mm/internal.h에 새로운 기능을 만들어 놓았음!
+                                    - mm/internal.c::mlock_vma_pages_range()
+                                
+                                        - Mark page as mlocked if not already.
+                                            mlock_vma_page()
+                                
+                                        - lock_page may only be called if we have the page's inode pinned.
+                                            linux/pagemap.h::lock_page(struct page *page)
+                                            -> mm/filemap.c::__lock_page()
+                                            -> __wait_on_bit_lock()
+                                
+                                    - mm/internal.c::munlock_vma_pages_all(struct vm_area_struct *v
+                                        - __munlock_vma_pages_range(vma, vma->vm_start, vma->vm_end);
+                                        - 워커 세팅
+                                            struct munlock_page_walk mpw = {
+                                            .vma = vma,
+                                            };
+                                
+                                            struct mm_walk munlock_page_walk = {
+                                            .pmd_entry = __munlock_pmd_handler, // pmd 세터
+                                            .pte_entry = __munlock_pte_handler, // pte 에 대해 munlock 해줌!
+                                            .private = &mpw,
+                                            .mm = mm,
+                                            };
+                                
+                                            - walk_page_range(start, end, &munlock_page_walk);
+                                                -> munlock_vma_page(page);
+                                
+                                    (3) c:page_evictable 에 mlocked 포함 unevictable 인 것을 확인함!
+                                    - new page 가 왜 나오지? 랑 fault path ??
+                                    - in the fault path, handle_mm_fault().
+                                        페이지 폴트로 실행하는 함수 루틴을 말함!
+                                
+                                    (4) mm/rmap.c::try_to_munlock() -> ClearPageMlocked()
+                                    - mm/rmap.c::try_to_unlock() munlock 으로 이름을 변경했는데, 
+                                       커밋 코멘트에 반영안되 있어서 햇갈렸음.
+                                        - https://lore.kernel.org/patchwork/patch/99978/
+                                    - 이것은 lru 리스트 링크 중 하나를 mlock_count로 사용하는 것을 효과적으로 대체합니다. ??
                                     
+                                    # 참고
+                                    - mlock(), mlock2(), mlockall()은 호출 프로세스 가상 주소 공간의 
+                                        일부 내지 전체를 램에 고정하여 그 메모리가 스왑 영역으로 빠지지 않도록 한다.
+                                    - https://man7.org/linux/man-pages/man2/mlock.2.html
+                                    - https://wariua.github.io/man-pages-ko/mlockall%282%29/
+                                
+                                @ CONFIG_UNEVICTABLE_LRU 1 -> MLOCK_PAGES 1
+                                
+                                int try_to_munlock(struct page *page)
+                                    -> try_to_unmap_anon(page, 1, 0);
+                                    -> if (MLOCK_PAGES && unlikely(unlock)) -> ret = SWAP_SUCCESS;
+                                
+                                /*
+                                    * Subfunctions of try_to_unmap: try_to_unmap_one called
+                                    * repeatedly from either try_to_unmap_anon or try_to_unmap_file.
+                                    */
+                                static int try_to_unmap_one(struct page *page, struct vm_area_struct *vma,
+                                                int migration)
+                                
+                                    * Mlocked pages:  check VM_LOCKED under mmap_sem held for read, if we can
+                                    * acquire it without blocking.  If vma locked, mlock the pages in the cluster,
+                                    * rather than unmapping them.  If we encounter the "check_page" that vmscan is
+                                    * trying to unmap, return SWAP_MLOCK, else default SWAP_AGAIN.
+                                
+                                13. [PATCH] vmscan: simplify shrink_inactive_list() - KOSAKI Motohiro
+                                    - https://github.com/torvalds/linux/commit/e247dbce5cc747a714e8dcbd6b3f442cc2a284cf
                                 </textarea>
                             </li>
                         </ol>
