@@ -2354,7 +2354,7 @@
 
                     <li>
                         <label for="menu-10-07">107 (2021-08-28) unevictable-lru 도큐먼트 Mlock 내용 정리</label>
-                        <input type="checkbox" id="menu-10-07" checked/>
+                        <input type="checkbox" id="menu-10-07"/>
                         <ol>
                             <li class="file">
                                 <a href="">107 (2021-08-28) unevictable-lru 도큐먼트 Mlock 내용 정리</a>
@@ -2362,6 +2362,10 @@
                                 # mlocked pages:
                                 - pages mapped into a VM_LOCKED VM
                                 - https://www.kernel.org/doc/html/latest/vm/unevictable-lru.html
+
+                                - Vmscan’s Handling of Unevictable Pages
+                                    page 가 VM_LOCKED VMA 에 map 되어 있고,
+                                    만약 try_to_unmap() 에서 SWAP_MLOCK을 리턴하면 shrink_page_list()가 해당 시점에 page를 cull함.
 
                                 1. The Unevictable LRU
                                   - The Unevictable Page List
@@ -2390,13 +2394,263 @@
                     </li>
 
                     <li>
-                        <label for="menu-10-08">108 (2021-09-04) : </label>
-                        <input type="checkbox" id="menu-10-08"/>
+                        <label for="menu-10-08">108 (2021-09-04) vmscan.c::shrink_page_list() 2008-10-20 이후의 패치 분석</label>
+                        <input type="checkbox" id="menu-10-08" checked/>
                         <ol>
                             <li class="file">
-                                <a href="">108 (2021-09-04) : </a>
-                                <textarea readonly>
+                                <a href="">108 (2021-09-04) vmscan.c::shrink_page_list() 2008-10-20 이후의 패치 분석 </a>
+                                <textarea rows="256" cols="180" readonly>
+                                @ 패치볼 때, 정한 스터디 규칙
+                                  (1) 커밋을 라인 필터링을 함
+                                  (2) 제목 및 간략한 커밋 코멘트 소스 변화 등 키워드를 아래 링크에서 검색을 하기
+                                    - https://www.kernel.org/doc/html/latest/
+                                    - https://linux-mm.org/
+                                    - https://kernelnewbies.org/
+                                    - https://lwn.net/
+                                    - 큰 그림이 필요한 패치는 해당 주제를 설명하는 핵심적인 도큐먼트 있는 경우가 많음
+                                
+                                (3) 도큐먼트 내용을 대략적으로 이해하고 해당 패치를 자세히 분석할 것인지 의논하고 분석하기!
+                                
+                                @ get_user_pages
+                                  - get_user_pages 유저 영역 페이지를 가져오고 pin 합니다.
+                                    해당 페이지는 회수나 스왑이 안됨.
+                                
+                                페이지는 DMA를 위해서 device에 제공되거나 커널 선형 매핑(kmap API를 통해)을 통해 접근 가능함.
+                                
+                                성능에 굉장히 민감한 어플리케이션을 위해서 get_user_pages_fast API를 제공하지만,
+                                거의 모든 API 에서 get_user_pages로 똑같이 선언되어 있음.
+                                
+                                Linux PCI 드라이버에서 작업하면서 이제 분산/수집을 사용하여 DMA용 코드를 작성하려고 할 때,
+                                사용자 공간에서 직접 DMA 데이터에 액세스하려면 사용자 공간 페이지를 커널 공간에 고정해야 해야함.
+                                  - https://stackoverflow.com/questions/36337942/how-does-get-user-pages-work-for-linux-driver
+                                사용 예제는 아래 링크에 나와있음.
+                                  - http://krishnamohanlinux.blogspot.com/2015/02/getuserpages-example.html
+
+                                @ af936a160624 (2008-10-20)  vmscan: unevictable LRU scan sysctl <Lee Schermerhorn>
+                                  - 참고 sysctl 과 /proc/sys/vm/scan_unevictable_pages 관련 추가 패치
+
+                                @ 03ba3782e8dc (2009-09-11)  writeback: switch to per-bdi threads for flushing data <Jens Axboe>
+                                  - Flushing out pdflush
+                                    https://lwn.net/Articles/326552/
+                                  - In defense of per-BDI writeback
+                                    https://lwn.net/Articles/354851/
+
+                                @ lumpy reclaim 관련 커널 히스토리
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/history/history.git/log/?qt=grep&q=lumpy+reclaim
+                                  
+                                  - (Wed Dec 06 2006) [PATCH 1/4] lumpy reclaim v2 <Andy Whitcroft>
+                                    http://lkml.iu.edu/hypermail/linux/kernel/0612.0/1743.html
+
+                                  a higher order allocation 으로 페이지 회수를 진행할 때,
+                                  하나의 페이지 씩 회수를 진행하지 않고, 회수 알고리즘이 요청한 order에 맞도록 lumps of pages들을 이동하게 합니다.
+                                  따라서 higher order allocations에서 회수되는 페이지들의 갯수를 줄일 수 있습니다.
+
+                                  - (2007-07-17) Lumpy Reclaim V4 <Andy Whitcroft>
+                                    https://git.kernel.org/pub/scm/linux/kernel/git/history/history.git/commit/?id=5ad333eb66ff1e52a87639822ae088577669dcf9
+
+                                    적절한 크기의 메모리가 부족하면 회수에 들어갑니다. 
+                                    현재 회수 알고리즘은 LRU order의 페이지를 대상으로 하며, 
+                                    이는 order-0에 충분히 공정하지만 higher orders 페이지를 원하는 경우에는 매우 부적합합니다. 
+                                    >95% 거의 대부분의 경우, 더 높은 순서의 페이지를 얻으려면 매우 높은 비율의 메모리를 날려버려야 합니다.
+                                    이 패치 세트는 "할당자"에 울퉁불퉁한 회수 알고리즘을 추가합니다.
+                                    active 및 inactive 목록의 끝에 고정된 지정된 순서의 페이지 그룹을 대상으로 합니다. 
+                                    이는 요청된 주문의 페이지 그룹이 active에서 inactive으로, active에서 free lists으로 이동하도록 권장합니다. 
+                                    이 동작은 higher order 페이지가 요청된 경우에만 direct reclaim에서 트리거합니다.
+                                    이 패치 세트는 유사한 회수 가능성의 페이지를 함께 그룹화하는 단편화 방지 체계와 함께 사용할 때 특히 효과적입니다. 
+                                    이 패치 세트는 기초를 형성하는 Peter Zijlstra의 울퉁불퉁한 회수 V2 패치를 기반으로 합니다.
+                                    sanitity checking을 해주신 Mel Gorman에게 감사를 표합니다. 
                                     
+                                    Mel said:
+                                     패치에는 hugepage pool resizing 기능이 있는 application이 있습니다.
+                                     Lumpy-reclaim이 ZONE_MOVABLE과 함께 사용될 때, 거대한 hugepages pool은 더 큰 신뢰성으로 크기를 조정할 수 있습니다. 
+                                     2GB RAM이 있는 데스크톱 컴퓨터에서 테스트한 결과
+                                     ZONE_MOVABLE을 사용하여 자체적으로 hugepages pool을 성장시키는 것은 성공률이 상당히 낮기 때문에 매우 느렸습니다.
+                                     lumpy-reclaim이 없으면, 풀을 100페이지씩 늘리려고 할 때마다 1 또는 2개의 거대한 페이지가 생성됩니다.
+                                     lumpy-reclaim이 있으면, 각 시도에서 40~70개의 거대한 페이지를 얻는 것이 일반적이었습니다.
+                                  
+                                  이후에 lumpy reclaim은 사용 범위를 점점 축소하고, 나중에는 기능이 삭제됨.
+                                    - Use compaction instead of lumpy reclaim
+                                      https://kernelnewbies.org/Linux_2_6_38#Memory_management
+                                    (2011-01-13) mm: vmscan: reclaim order-0 and use compaction instead of lumpy reclaim <Mel Gorman>
+                                    - http://git.kernel.org/linus/3e7d344970673c5334cf7b5bb27c8c0942b06126
+                                      7d3579e8e619 (2010-10-26)  vmscan: narrow the scenarios in whcih lumpy reclaim uses synchrounous reclaim <KOSAKI Motohiro>
+                                      c53919adc045 (2012-05-29)  mm: vmscan: remove lumpy reclaim <Mel Gorman>
+                                
+                                @ (2010-08-09)  vmscan: simplify shrink_inactive_list() <KOSAKI Motohiro>
+                                  - shrink_inactive_list에서 배치처리를 안하고 한번에 (조각조각 nr_taken 하는 반복문 한 겹을 지움)
+                                  - https://github.com/iamroot16/linux/commit/e247dbce5cc7
+
+                                @ (2011-10-31)  mm: vmscan: throttle reclaim if encountering too many dirty pages under writeback <Mel Gorman>
+                                  - nr_writeback과 priority 관련 congestion wait 관련 첫번째 패치.
+                                  - https://github.com/iamroot16/linux/commit/92df3a723f84
+                                  - 여기부터 v3.2-rc1
+                                
+                                    include/linux/mmzone.h
+                                    * The "priority" of VM scanning is how much of the queues we will scan in one
+                                    * go. A value of 12 for DEF_PRIORITY implies that we will scan 1/4096th of the
+                                    * queues ("queue_length >> 12") during an aging round.
+                                    #define DEF_PRIORITY 12
+
+                                    mm/backing-dev.c
+                                    * wait_iff_congested - Conditionally wait for a backing_dev to become uncongested or a pgdat to complete writes
+                                    * @sync: SYNC or ASYNC IO
+                                    * @timeout: timeout in jiffies
+                                    *
+                                    * In the event of a congested backing_dev (any backing_dev) this waits
+                                    * for up to @timeout jiffies for either a BDI to exit congestion of the
+                                    * given @sync queue or a write to complete.
+                                    *
+                                    * The return value is 0 if the sleep is for the full timeout. Otherwise,
+                                    * it is the number of jiffies that were still remaining when the function
+                                    * returned. return_value == timeout implies the function did not sleep.
+                                    */
+                                    long wait_iff_congested(int sync, long timeout)
+
+                                    mm/vmscan.c
+                                    * This is the main entry point to direct page reclaim.
+                                    *
+                                    * If a full scan of the inactive list fails to free enough memory then we
+                                    * are "out of memory" and something needs to be killed.
+                                    *
+                                    * If the caller is !__GFP_FS then the probability of a failure is reasonably
+                                    * high - the zone may be full of dirty or under-writeback pages, which this
+                                    * caller can't do much about.  We kick the writeback threads and take explicit
+                                    * naps in the hope that some of these pages can be written.  But if the
+                                    * allocating task holds filesystem locks which prevent writeout this might not
+                                    * work, and the allocation attempt will fail.
+                                    *
+                                    * returns:	0, if no pages reclaimed
+                                    * 		else, the number of pages reclaimed
+                                    static unsigned long do_try_to_free_pages(struct zonelist *zonelist,
+                                                        struct scan_control *sc,
+                                                        struct shrink_control *shrink)
+                                    
+                                        for (priority = DEF_PRIORITY; priority >= 0; priority--) {
+                                            sc->nr_scanned = 0;
+                                            if (!priority)
+                                                disable_swap_token(sc->mem_cgroup);
+                                            shrink_zones(priority, zonelist, sc);
+                                    
+                                        // 해당 priority를 가지고 shrink_inactive_list까지 쭉 진행됨 아래에서 살펴보자
+                                    
+                                    /*
+                                    * shrink_inactive_list() is a helper for shrink_zone().  It returns the number
+                                    * of reclaimed pages
+                                    */
+                                    static noinline_for_stack unsigned long
+                                    shrink_inactive_list(unsigned long nr_to_scan, struct zone *zone,
+                                                struct scan_control *sc, int priority, int file)
+                                    // ...
+
+                                        if (nr_writeback && nr_writeback >= (nr_taken >> (DEF_PRIORITY-priority)))
+                                            wait_iff_congested(zone, BLK_RW_ASYNC, HZ/10);
+
+                                    즉 wait_iff_congested === throttle
+
+                                    priority -> 12
+                                    nr_taken >> (DEF_PRIORITY-priority) -> nr_taken >> 0 
+                                    nr_writeback >= nr_taken이 가장 큼!
+                                    -> 통과하기 힘듬 -> 가기 쉬움! -> 스캔을 많이함 -> 회수가 잘됨
+                                    
+                                    priority -> 2
+                                    // DEF_PRIORITY 100% isolated pages must be PageWriteback to throttle
+                                    nr_taken >> (DEF_PRIORITY-priority) -> nr_taken >> 2
+                                    nr_writeback >= nr_taken의 25% 정도의 역치!
+                                    -> 통과하기 쉬움 -> 못가게 기다림(throttle) -> 스캔 횟수를 줄임 -> 회수가 안됨
+                                    
+                                    priority -> 0 
+                                    // DEF_PRIORITY 100% isolated pages must be PageWriteback to throttle
+                                    nr_taken >> (DEF_PRIORITY-priority) -> nr_taken >> 12
+                                    nr_writeback >= nr_taken이 가장 작음!
+                                    -> 통과하기 쉬움 -> 못가게 기다림(throttle) -> 스캔 횟수를 줄임 -> 회수가 안됨
+
+                                    nr_taken = isolate_pages_global() // nr_scanned는 올라감
+                                    nr_reclaimed = shrink_page_list()
+                                    
+                                    회수가 쓰기 저장에서 더티 페이지를 격리하는 경우 수명이 긴 페이지 할당 비율이 페이지 세탁 비율을 초과하고 있음을 의미합니다.
+                                    영역 전체에 페이지 배포로 인해 전역 제한이 스로틀 프로세스에 효과적이지 않거나 느린 지원 장치를 많이 사용합니다.
+                                    유일한 옵션은 더티링 프로세스가 balance_dirty_pages()가 관리하는 것과 같은 방식으로 조절된다는 보장이 없기 때문에,
+                                    이상적이지 않은 회수 컨텍스트에서 조절하는 것입니다.
+                                    이것은 우선 순위에 따라 조절하기 전에 쓰기 저장(writeback) 상태에 있어야 하는 더티 페이지 수를 조정합니다.
+                                    DEF_PRIORITY ~ DEF_PRIORITY-2 범위에서 가장 큰 영향을 미치는 단순 백오프 함수로
+                                    우선순위 회수는 문제가 있는 것으로 간주되고 회수는 문제가 있는 것으로 간주됩니다.
+                                    
+                                    DEF_PRIORITY   100% isolated pages must be PageWriteback to throttle
+                                    DEF_PRIORITY-1  50% must be PageWriteback
+                                    DEF_PRIORITY-2  25% must be PageWriteback, kswapd in trouble
+                                    ...
+                                    DEF_PRIORITY-6 For SWAP_CLUSTER_MAX isolated pages, throttle if any
+                                                        isolated page is PageWriteback
+
+                                v3.2-rc1 이 당시 스왑도를 살펴볼까?
+            
+                                https://github.com/iamroot16/linux/blob/92df3a723f84cdf8133560bbff950a7a99e92bc9/mm/vmscan.c#L1831
+                                static int vmscan_swappiness(struct scan_control *sc)
+                                {
+                                    if (scanning_global_lru(sc))
+                                        return vm_swappiness;
+                                    return mem_cgroup_swappiness(sc->mem_cgroup);
+                                }
+                                
+                                /*
+                                * Determine how aggressively the anon and file LRU lists should be
+                                * scanned.  The relative value of each set of LRU lists is determined
+                                * by looking at the fraction of the pages scanned we did rotate back
+                                * onto the active list instead of evict.
+                                *
+                                * nr[0] = anon pages to scan; nr[1] = file pages to scan
+                                */
+                                static void get_scan_count(struct zone *zone, struct scan_control *sc,
+                                                    unsigned long *nr, int priority)
+                                    // ...
+                                    /*
+                                    * With swappiness at 100, anonymous and file have the same priority.
+                                    * This scanning priority is essentially the inverse of IO cost.
+                                    */
+                                    anon_prio = vmscan_swappiness(sc);
+                                    file_prio = 200 - vmscan_swappiness(sc);
+                                    // ...
+
+                                https://github.com/iamroot16/linux/blob/92df3a723f84cdf8133560bbff950a7a99e92bc9/mm/vmscan.c#L2196
+                                /*
+                                * From 0 .. 100.  Higher means more swappy.
+                                */
+                                int vm_swappiness = 60;
+                    
+                                @ 스왑도 관련 패치 정리
+                                v2.6.28-rc1 부터 get_scan_ratio() 함수로 들어옴.
+                                  - 해당 함수는 스왑도 세터로 사용함
+                                  - swap_tendency 해당 패치에서 삭제됨
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v2.6.28-rc1&id=4f98a2fee8acdb4ac84545df98cccecfd130f8db
+
+                                v2.6.35 에서 get_scan_count()로 이름을 변경함.
+                                - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v2.6.35-rc1&id=76a33fc380c9a65e01eb15b3b87c05863a0d51db
+
+                                @ 599d0c954f91 (2016-07-28)  mm, vmscan: move LRU lists to node <Mel Gorman>
+                                  - zone -> node로 각종 통계 카운터와 기능을 옮기는 패치
+
+                                  1. Long-term isolation of highmem pages when reclaim is lowmem
+                                    That would reduce the skip rate with the potential corner case is that
+                                    highmem pages have to be scanned and reclaimed to free lowmem slab pages.
+
+                                  2. Linear scan lowmem pages if the initial LRU shrink fails
+                                    This will break LRU ordering but may be preferable and faster during
+                                    memory pressure than skipping LRU pages.
+
+                                #####################################################################################
+                                
+                                다시 v5.1 소스로 돌아가서 shrink_list(2.6.11) vs shrink_page_list(5.1) 차이를 살펴보자
+                                
+                                memcg가 있다 +
+                                kswapd, direct reclaim에 의한 호출 구분 +
+                                
+                                io실패 및 write back대기시간에 대한 처리 //
+                                huge page에 대한 처리
+                                Mlocked에 대한 처리 // 
+                                evictable에 대한 처리 // 
+                                swap backed 플래그 처리 //
+                                  - swap backed 추가 첫번째 커밋
+                                    https://github.com/iamroot16/linux/commit/b2e185384f534781fd22f5ce170b2ad26f97df70
                                 </textarea>
                             </li>
                         </ol>
@@ -2441,10 +2695,23 @@
                         </ol>
                     </li>
 
+                    <li>
+                        <label for="menu-10-12">112 (2021-10-09) : </label>
+                        <input type="checkbox" id="menu-10-12"/>
+                        <ol>
+                            <li class="file">
+                                <a href="">112 (2021-10-09) : </a>
+                                <textarea readonly>
+                                    
+                                </textarea>
+                            </li>
+                        </ol>
+                    </li>
+
                 </ol>
             </li>
             
-        </ol>        
+        </ol>
     </nav>
 
 <footer>
@@ -2575,7 +2842,7 @@ textarea {
     display: block;
     border: none;
     resize: none;
-    font-size: 12px;
+    font-size: 11px;
 }
 
 .fs-8 { font-size: 8px; }
