@@ -2395,7 +2395,7 @@
 
                     <li>
                         <label for="menu-10-08">108 (2021-09-04) vmscan.c::shrink_page_list() 2008-10-20 이후의 패치 분석</label>
-                        <input type="checkbox" id="menu-10-08" checked/>
+                        <input type="checkbox" id="menu-10-08"/>
                         <ol>
                             <li class="file">
                                 <a href="">108 (2021-09-04) vmscan.c::shrink_page_list() 2008-10-20 이후의 패치 분석 </a>
@@ -2658,11 +2658,11 @@
 
                     <li>
                         <label for="menu-10-09">109 (2021-09-11) : v5.1 vmpressure, page reclaim 분석</label>
-                        <input type="checkbox" id="menu-10-09"/>
+                        <input type="checkbox" id="menu-10-09" checked/>
                         <ol>
                             <li class="file">
                                 <a href="">109 (2021-09-11) : v5.1 vmpressure, page reclaim 분석</a>
-                                <textarea readonly>
+                                <textarea rows="145" cols="186" readonly>
                                 @ direct page reclaim의 진입점 mm/vmscan.c::try_to_free_pages()
                                   - This is the main entry point to direct page reclaim.
                                   페이지 회수 코어 동작을 맡고 있는 mm/vmscan.c::shrink_page_list()까지 살펴봅니다.
@@ -2670,6 +2670,27 @@
                                 페이지 회수동작은 코어 함수의 몸통의 주석을 이해하는 것을 목표로 합니다.
                                 - LRU 테일에 위치한 페이지가 writeback 상태에 있을 때에 3가지 경우에 대해서 고민해야 합니다.
                                 - If a page at the tail of the LRU is under writeback, there are three cases to consider.
+
+                                1) 회수 시 쓰기 되돌림 중인 페이지 수가 너무 많고 이 페이지가 쓰기 되돌림 및 PageReclaim 하에 있는 경우 
+                                   페이지가 IO를 위해 대기 중이지만 IO가 완료될 수 있기 전에 LRU를 통해 재활용되고 있음을 나타냅니다.
+                                   페이지 자체에서 기다리는 것은 IO 오류 또는 연결 해제된 스토리지로 인해 페이지 쓰기 저장이 불가능한 경우 
+                                   무기한 지연 위험이 있으므로 대신 LRU가 너무 빨리 스캔되고 호출자가 페이지 목록이 처리된 후 지연될 수 있습니다.
+
+                                2) 전역 또는 새 memcg reclaim에서 즉시 회수로 표시되지 않은 페이지를 발견했습니다.
+                                   또는 호출자에게 __GFP_FS(또는 fs가 아닌 단순히 스왑하려는 경우 __GFP_IO)가 없습니다.
+                                   이 경우 즉시 회수할 페이지를 표시하고 스캔을 계속하십시오.
+                                   아직 IO를 제출하지 않았을 수 있는 fs를 기다릴 것이기 때문에 may_enter_fs가 필요합니다.
+                                   그리고 루프 드라이버는 쓰기를 수행하는 데 필요한 페이지에서 대기하는 경우 회수 및 교착 상태에 들어갈 수 있습니다
+                                   (이런 이유로 루프는 __GFP_IO|__GFP_FS를 마스킹함).
+                                   그러나 더 많은 생각은 아마도 더 많은 이유를 보여줄 것입니다.
+
+                                3) 기존 memcg에서 이미 PageReclaim으로 표시된 페이지를 발견했습니다.
+                                  memcg에는 더티 페이지 스로틀링이 없으므로 너무 많은 페이지가 writeback에 있고 회수할 다른 것이 없기 때문에 쉽게 OOM할 수 있습니다.
+                                  쓰기 저장이 완료될 때까지 기다립니다.
+
+                                1)과 2)의 경우 비활성 목록에서 깨끗한 페이지를 계속 검색하고 활성 목록에서 다시 채우는 동안 페이지를 활성화하여 방해가 되지 않도록 합니다.
+                                여기서 관찰된 사실은 디스크 쓰기를 기다리는 것이 잠재적으로 라인을 다시 로드하는 것보다 비용이 더 많이 든다는 것입니다.
+                                즉시 회수하도록 표시되어 있으므로 디스크에 기록하는 데 걸리는 시간보다 더 이상 캐시 작업 집합에 메모리 압력을 가하지 않습니다.
 
                                 @ global_reclaim -> CASE 2의 개념과 연결됨.
                                   (1) global_reclaim vs sane_reclaim
@@ -2737,27 +2758,24 @@
 
                                 또한 CONFIG_MEMCG=n 경우에 대해 완전히 동일한 API 호환[2] 인터페이스 구현(예: 내장)도 실행 가능한 옵션이므로 사용자 영역에서 변경할 필요가 없습니다.
 
+                                @ memcg
+                                 (1) mm/memcontrol.c 처음 들어온 패치
+                                    - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=8cdea7c05454260c0d4d83503949c358eb131d17
+                                 (2) memory controller: soft limit reclaim on contention
+                                    v2.6.32-rc1 mem_cgroup_soft_limit_reclaim() 함수를 추가함
+                                    - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=4e41695356fb4e0b153be1440ad027e46e0a7ea2
 
-                                mm/memcontrol.c 처음 커밋
-                                https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=8cdea7c05454260c0d4d83503949c358eb131d17
-
-
-                                memory controller: soft limit reclaim on contention
-                                v2.6.32-rc1 mem_cgroup_soft_limit_reclaim() 함수를 추가함
-
-                                https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=4e41695356fb4e0b153be1440ad027e46e0a7ea2
-
-                                @ ret_nr_immediate 3.11-rc1 에 많이 수정됨
-                                  mm: vmscan: do not scale writeback pages when deciding whether to set ZONE_WRITEBACK
-                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=918fc718c5922520c499ad60f61b8df86b998ae9
-                                  mm: vmscan: treat pages marked for immediate reclaim as zone congestion
-                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=d04e8acd03e5c3421ef18e3da7bc88d56179ca42
-                                  mm: vmscan: move direct reclaim wait_iff_congested into shrink_list
-                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=8e950282804558e4605401b9c79c1d34f0d73507
-                                  mm: vmscan: stall page reclaim after a list of pages have been processed
-                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=b1a6f21e3b2315d46ae8af88a8f4eb8ea2763107
-
-                                  mm: vmscan: block kswapd if it is encountering pages under writeback
+                                @ ret_nr_immediate 3.11-rc1 에 많이 수정되었음. 아래는 최신순으로 나열한 패치들
+                                 (1) mm: vmscan: do not scale writeback pages when deciding whether to set ZONE_WRITEBACK
+                                   - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=918fc718c5922520c499ad60f61b8df86b998ae9
+                                 (2) mm: vmscan: treat pages marked for immediate reclaim as zone congestion
+                                   - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=d04e8acd03e5c3421ef18e3da7bc88d56179ca42
+                                 (3) mm: vmscan: move direct reclaim wait_iff_congested into shrink_list
+                                   - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=8e950282804558e4605401b9c79c1d34f0d73507
+                                 (4) mm: vmscan: stall page reclaim after a list of pages have been processed
+                                   - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=b1a6f21e3b2315d46ae8af88a8f4eb8ea2763107
+                                 (5) mm: vmscan: block kswapd if it is encountering pages under writeback
+                                    아래 CASE 2 가 들어온 패치임
                                    * 2) Global reclaim encounters a page, memcg encounters a
                                    *    page that is not marked for immediate reclaim or
                                    *    the caller does not have __GFP_IO. In this case mark
@@ -2775,10 +2793,8 @@
                                    *    grab_cache_page_write_begin(,,AOP_FLAG_NOFS), so testing
                                    *    may_enter_fs here is liable to OOM on them.
                                   - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=283aba9f9e0e4882bf09bd37a2983379a6fae805
-
-                                  mm/vmscan: store "priority" in struct scan_control
+                                 (6) mm/vmscan: store "priority" in struct scan_control
                                   - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=9e3b2f8cd340e13353a44c9a34caef2848131ed7
-
                                 </textarea>
                             </li>
                         </ol>
