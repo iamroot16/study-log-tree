@@ -10,7 +10,7 @@
     </header>
 
     <section>
-        <p>
+        <p id="param">
             We planed studying on week [001 ~ 067] Arm64 Linux kernel boot flow.
             so, we reviewed source code line by line,
             from <i>arch/arm64/kernel/head.S</i> to <i>init/main.c::start_kernel() → mm/page_alloc.c::page_alloc_init()</i>.
@@ -2657,13 +2657,128 @@
                     </li>
 
                     <li>
-                        <label for="menu-10-09">109 (2021-09-11) : </label>
+                        <label for="menu-10-09">109 (2021-09-11) : v5.1 vmpressure, page reclaim 분석</label>
                         <input type="checkbox" id="menu-10-09"/>
                         <ol>
                             <li class="file">
-                                <a href="">109 (2021-09-11) : </a>
+                                <a href="">109 (2021-09-11) : v5.1 vmpressure, page reclaim 분석</a>
                                 <textarea readonly>
-                                    
+                                @ direct page reclaim의 진입점 mm/vmscan.c::try_to_free_pages()
+                                  - This is the main entry point to direct page reclaim.
+                                  페이지 회수 코어 동작을 맡고 있는 mm/vmscan.c::shrink_page_list()까지 살펴봅니다.
+
+                                페이지 회수동작은 코어 함수의 몸통의 주석을 이해하는 것을 목표로 합니다.
+                                - LRU 테일에 위치한 페이지가 writeback 상태에 있을 때에 3가지 경우에 대해서 고민해야 합니다.
+                                - If a page at the tail of the LRU is under writeback, there are three cases to consider.
+
+                                @ global_reclaim -> CASE 2의 개념과 연결됨.
+                                  (1) global_reclaim vs sane_reclaim
+                                    #ifdef CONFIG_MEMCG
+                                    static bool global_reclaim(struct scan_control *sc)
+                                    {  // !CONFIG_MEMCG // return true;
+                                        return !sc->target_mem_cgroup; 
+                                    }
+
+                                  *** sane_reclaim - 일반적인 dirty throttling mechanism 동작하는지 여부를 리턴함.
+                                   balance_dirty_pages()의 normal page dirty throttling mechanism은 legacy memcg로 완전히 깨졌고, 
+                                   대신에 shrink_page_list()의 direct stalling을 throttling에 사용합니다.
+
+                                  shrink_page_list()의 direct stalling은 공정성, 
+                                  adaptive pausing, bandwidth proportional allocation 및 configurability과 같은 모든 장점이 부족합니다.
+
+                                  이 불리언 함수는 현재 진행 중이고 normal dirty throttling mechanism이 작동 중이라고 가정할 수 있는 vmscan의 여부를 확인해줍니다.
+                                  static bool sane_reclaim(struct scan_control *sc)
+                                  { // !CONFIG_MEMCG // return true;
+                                      struct mem_cgroup *memcg = sc->target_mem_cgroup;
+                                      if (!memcg)
+                                          return true;
+                                      return false;
+                                  }
+
+                                (2) min_slab_ratio (/proc/sys/vm/min_slab_ratio, vm.min_slab_ratio)
+                                  기본값은 5%입니다. 이 설정은 NUMA 커널에서만 사용할 수 있습니다. 각 zone의 총 페이지에 대한 비율입니다
+                                  zone에서 페이지 회수 할 때(fallbak 루틴으로 로컬 zone을 대체할 때) 영역에서 이 비율보다 많은 페이지가 회수 가능한 slab 페이지들을 회수합니다.
+                                  따라서 global_reclaim 을 거의 수행하지 않는 NUMA 시스템에서도 slab 페이지들이 커지는 것을 제어할 수 있습니다.
+                                  slab을 회수하는 동작은 zone/node 별로 트리거 합니다.
+                                  slab 메모리를 회수하는 프로세스는 현재 노드에 한정되지 않으며 빠르지 않을 수도 있습니다.
+                                  - https://sysctl-explorer.net/vm/min_slab_ratio/
+
+                                @ vmpressure
+                                  memcg: add memory.pressure_level events
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmpressure.c?h=v3.10-rc1&id=70ddf637eebe47e61fb2be08a59315581b6d2f38
+
+                                이 패치를 통해 상호 작용/메모리 할당 비용을 유지하려는 사용자 영역 응용 프로그램은 압력 수준 알림을 사용할 수 있습니다. 
+                                수준은 다음과 같이 정의됩니다.
+
+                                "low" 수준은 시스템이 새 할당을 위해 메모리를 회수하고 있음을 의미합니다. 
+                                이 회수 활동을 모니터링하면 캐시 수준을 유지 관리하는 데 유용할 수 있습니다.
+
+                                통지 시 프로그램(일반적으로 "Activity Manager")은 vmstat를 분석하고 사전에 조치를 취할 수 있습니다(즉, 중요하지 않은 서비스를 조기에 종료).
+
+                                "medium" 수준은 시스템에 중간 메모리 부족이 발생하고 시스템이 스왑을 수행 중이거나 활성 파일 캐시를 페이징 아웃하는 등을 의미합니다.
+
+                                이 이벤트가 발생하면 애플리케이션은 vmstat/zoneinfo/memcg 또는 내부 메모리 사용 통계를 추가로 분석하고 
+                                디스크에서 쉽게 재구성하거나 다시 읽을 수 있는 리소스를 해제할 수 있습니다. 
+
+                                "critical" 수준은 시스템이 능동적으로 스래싱 중이거나 OOM(메모리 부족) 상태이거나 커널 내 OOM 킬러가 트리거되는 중임을 의미합니다. 
+                                애플리케이션은 시스템을 돕기 위해 할 수 있는 모든 일을 해야 합니다.
+
+                                vmstat 또는 기타 통계를 참조하기에는 너무 늦을 수 있으므로 즉각적인 조치를 취하는 것이 좋습니다.
+                                이벤트는 이벤트가 처리될 때까지, 즉 이벤트가 통과되지 않을 때까지 위쪽으로 전파됩니다.
+                                이것이 의미하는 바는 다음과 같습니다. 예를 들어 세 개의 cgroup이 있습니다: A->B->C.
+                                이제 cgroup A, B 및 C에 이벤트 리스너를 설정하고 그룹 C가 약간의 압력을 받는다고 가정합니다.
+                                이러한 상황에서, 그룹 C만 알림을 받습니다.
+                                즉, 그룹 A와 B는 알림을 받지 않습니다. 이것은 메시지의 과도한 "브로드캐스팅"을 피하기 위해 수행됩니다.
+                                이는 시스템을 방해하고 특히 메모리가 부족하거나 스래싱이 심한 경우에 나쁩니다.
+                                따라서 cgroup을 현명하게 구성하거나 이벤트를 수동으로 전파하십시오.
+                                나머지 memcg 기능과 달리 부기.
+                                불행히도 현재 memcg 구현에서 페이지 계정은 분리할 수 없는 부분이며 해제할 수 없습니다.
+                                좋은 소식은 상황을 개선하기 위한 노력[1]이 있다는 것입니다.
+
+                                또한 CONFIG_MEMCG=n 경우에 대해 완전히 동일한 API 호환[2] 인터페이스 구현(예: 내장)도 실행 가능한 옵션이므로 사용자 영역에서 변경할 필요가 없습니다.
+
+
+                                mm/memcontrol.c 처음 커밋
+                                https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=8cdea7c05454260c0d4d83503949c358eb131d17
+
+
+                                memory controller: soft limit reclaim on contention
+                                v2.6.32-rc1 mem_cgroup_soft_limit_reclaim() 함수를 추가함
+
+                                https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=4e41695356fb4e0b153be1440ad027e46e0a7ea2
+
+                                @ ret_nr_immediate 3.11-rc1 에 많이 수정됨
+                                  mm: vmscan: do not scale writeback pages when deciding whether to set ZONE_WRITEBACK
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=918fc718c5922520c499ad60f61b8df86b998ae9
+                                  mm: vmscan: treat pages marked for immediate reclaim as zone congestion
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=d04e8acd03e5c3421ef18e3da7bc88d56179ca42
+                                  mm: vmscan: move direct reclaim wait_iff_congested into shrink_list
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=8e950282804558e4605401b9c79c1d34f0d73507
+                                  mm: vmscan: stall page reclaim after a list of pages have been processed
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=b1a6f21e3b2315d46ae8af88a8f4eb8ea2763107
+
+                                  mm: vmscan: block kswapd if it is encountering pages under writeback
+                                   * 2) Global reclaim encounters a page, memcg encounters a
+                                   *    page that is not marked for immediate reclaim or
+                                   *    the caller does not have __GFP_IO. In this case mark
+                                   *    the page for immediate reclaim and continue scanning.
+                                   *
+                                   *    __GFP_IO is checked  because a loop driver thread might
+                                   *    enter reclaim, and deadlock if it waits on a page for
+                                   *    which it is needed to do the write (loop masks off
+                                   *    __GFP_IO|__GFP_FS for this reason); but more thought
+                                   *    would probably show more reasons.
+                                   *
+                                   *    Don't require __GFP_FS, since we're not going into the
+                                   *    FS, just waiting on its writeback completion. Worryingly,
+                                   *    ext4 gfs2 and xfs allocate pages with
+                                   *    grab_cache_page_write_begin(,,AOP_FLAG_NOFS), so testing
+                                   *    may_enter_fs here is liable to OOM on them.
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=283aba9f9e0e4882bf09bd37a2983379a6fae805
+
+                                  mm/vmscan: store "priority" in struct scan_control
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=9e3b2f8cd340e13353a44c9a34caef2848131ed7
+
                                 </textarea>
                             </li>
                         </ol>
@@ -2780,9 +2895,13 @@ async function canvas2png(canvas) {
 #container {
     border: 4px ridge;
     overflow: auto;
-    min-width: 1280px;
+    min-width: 1200px;
     min-height: 80vh;
     max-height: 80vh;
+}
+
+#param {
+    font-size: 0.9em;
 }
 
 li {
@@ -2844,6 +2963,8 @@ textarea {
     resize: none;
     font-size: 0.9em;
 }
+
+footer { font-size: 0.6em; }
 
 .fs-8 { font-size: 0.4em; }
 
