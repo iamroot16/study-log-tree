@@ -2960,6 +2960,157 @@
                         </ol>
                     </li>
 
+                                @ mm/vmscan.c::shrink_node()
+                                    node order로 구축한 zonelists
+                                    zone을 순회하면서 node가 같은 경우는 건너 뛴다. node base reclaim
+                                    - http://jake.dothome.co.kr/build_all_zonelists/
+                                
+                                    [PATCH 10/34] mm, vmscan: by default have direct reclaim only shrink once per node
+                                    : only shrink once per node.
+                                    /*
+                                    * Shrink each node in the zonelist once. If the
+                                    * zonelist is ordered by zone (not the default) then a
+                                    * node may be shrunk multiple times but in that case
+                                    * the user prefers lower zones being preserved.
+                                    */
+                                    if (zone->zone_pgdat == last_pgdat)
+                                        continue;
+                                    - https://lore.kernel.org/lkml/1467970510-21195-11-git-send-email-mgorman@techsingularity.net/
+                                
+                                    fallback list -> zone / node
+                                    - build_all_zonelists 참고: http://jake.dothome.co.kr/build_all_zonelists/
+                                
+                                    shrink_node() 에서 memcg = mem_cgroup_iter() 를 호출함
+                                    memcg 트리가 있고, do while 로 트리를 순회함
+                                    memcg는 노드 별로 있음
+                                
+                                @ mm/vmscan.c::shrink_node_memcg()
+                                    - kswapd & direct reclaim 에서 사용하는 node 별 페이지 할당 해제를 맡고 있습니다.
+                                    - This is a basic per-node page freer.  Used by both kswapd and direct reclaim.
+                                
+                                @memcg 별 파라미터 설정 관련
+                                    mm/vmscan.c::get_scan_count()
+                                    -> struct mem_cgroup *memcg,
+                                    - https://zetawiki.com/wiki/리눅스_swappiness
+                                    - https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memory.html
+                                
+                                @ free+file + inactive anon 관련 패치 정리
+                                    mm: consider whether to decivate based on eligible zones inactive ratio
+                                    scan control 이 인자로 들어온 패치
+                                    - https://github.com/iamroot16/linux/commit/f8d1a31163fcb3bf93f6c78770c3c1915f065bf9
+                                
+                                    mm: vmscan: reduce size of inactive file list
+                                    include/linux/memcontrol.h::mem_cgroup_inactive_anon_is_low() -> mm/vmscan.c::inactive_list_is_low() 로 리팩토링한 패치
+                                    - https://github.com/iamroot16/linux/commit/59dc76b0d4dfdd7dc46a1010e4afb44f60f3e97f
+                                
+                                    memcg: skip scanning active lists based on individual size
+                                    mm/memcontrol.c::calc_inactive_ratio() -> mm/memcontrol.c::mem_cgroup_inactive_anon_is_low()
+                                    - return inactive * inactive_ratio < active;
+                                    https://github.com/iamroot16/linux/commit/9b272977e3b99a8699361d214b51f98c8a9e0e7b
+                                
+                                
+                                    mm, vmscan: move LRU lists to node
+                                    - https://github.com/iamroot16/linux/commit/599d0c954f91d0689c9bb421b5bc04ea02437a41
+                                    mm, vmscan: move lru_lock to the node
+                                    - https://github.com/iamroot16/linux/commit/a52633d8e9c35832f1409dc5fa166019048a3f1f#diff-d503e0c4ef59449a7b9dd9f14c3f88b35578cdec99edbd05970e0599faf1c324
+                                
+                                    revert "mm: vmscan: do not swap anon pages just because free+file is low"
+                                    - https://github.com/iamroot16/linux/commit/623762517e2370be3b3f95f4fe08d6c063a49b06
+                                
+                                    memcg, vmscan: Fix forced scan of anonymous pages
+                                    - https://github.com/iamroot16/linux/commit/2ab051e11bfa3cbb7b24177f3d6aaed10a0d743e
+                                
+                                    mm, vmscan: move LRU lists to node
+                                    - https://github.com/iamroot16/linux/commit/599d0c954f91d0689c9bb421b5bc04ea02437a41
+                                
+                                    mm: vmscan: clean up get_scan_count()
+                                        enum scan_balance {
+                                            SCAN_EQUAL,
+                                            SCAN_FRACT,
+                                            SCAN_ANON,
+                                            SCAN_FILE,
+                                        }; 추가함
+                                    - https://github.com/iamroot16/linux/commit/9a2651140ef740b3b67ad47ea3d0af75581aacc6
+                                
+                                    mm: make get_scan_ratio() safe for memcg
+                                    - https://github.com/iamroot16/linux/commit/eeee9a8cd1e93c8b94e7788790fa9e2f8910c779
+                                
+                                    vmscan: split LRU lists into anon & file sets
+                                    - https://github.com/iamroot16/linux/commit/4f98a2fee8acdb4ac84545df98cccecfd130f8db
+                                
+                                    /* If we have very few page cache pages, force-scan anon pages. */
+                                    if (unlikely(file + free <= zone->pages_high))
+                                
+                                    static bool inactive_list_is_low(struct lruvec *lruvec, bool file -> (4) anon (5) file
+                                
+                                    @ rotate: LRU의 선두로 옮긴다.
+                                    - http://jake.dothome.co.kr/lru-lists-pagevecs/
+                                
+                                
+                                    @ shrink_node_memcg() 에서 사용하는 get_scan_ratio() 함수를 추가한 패치
+                                    - https://github.com/iamroot16/linux/commit/4f98a2fee8acdb4ac84545df98cccecfd130f8db#diff-d503e0c4ef59449a7b9dd9f14c3f88b35578cdec99edbd05970e0599faf1c324R1252
+                                    - 최초의 산식을 한번 살펴보자
+                                    /*
+                                     * With swappiness at 100, anonymous and file have the same priority.
+                                     * This scanning priority is essentially the inverse of IO cost.
+                                     */
+                                    anon_prio = sc->swappiness;
+                                    file_prio = 200 - sc->swappiness;
+                                
+                                    /*
+                                     *                  anon       recent_rotated[0]
+                                     * %anon = 100 * ----------- / ----------------- * IO cost
+                                     *               anon + file      rotate_sum
+                                     */
+                                    ap = (anon_prio + 1) * (zone->recent_scanned[0] + 1);
+                                    ap /= zone->recent_rotated[0] + 1;
+                                
+                                    fp = (file_prio + 1) * (zone->recent_scanned[1] + 1);
+                                    fp /= zone->recent_rotated[1] + 1;
+                                
+                                    /* Normalize to percentages */
+                                    percent[0] = 100 * ap / (ap + fp + 1);
+                                    percent[1] = 100 - percent[0];
+                                
+                                
+                                /*
+                                 * blk_plug permits building a queue of related requests by holding the I/O
+                                 * fragments for a short period. This allows merging of sequential requests
+                                 * into single larger request. As the requests are moved from a per-task list to
+                                 * the device's request_queue in a batch, this results in improved scalability
+                                 * as the lock contention for request_queue lock is reduced.
+                                 *
+                                 * It is ok not to disable preemption when adding the request to the plug list
+                                 * or when attempting a merge, because blk_schedule_flush_list() will only flush
+                                 * the plug list when the task sleeps by itself. For details, please see
+                                 * schedule() where blk_schedule_flush_plug() is called.
+                                 */
+                                struct blk_plug {
+                                    struct list_head mq_list; /* blk-mq requests */
+                                    struct list_head cb_list; /* md requires an unplug callback */
+                                    unsigned short rq_count;
+                                    bool multiple_queues;
+                                };
+                                
+                                @ blk_start_plug(&plug); ~ blk_finish_plug(&plug);
+                                    : 태스크의 plug에 blk_plug를 대입하여 배치 i/o가 시작 / 완료한 것을 알린다.
+                                
+                                @ scan_adjusted = (global_reclaim(sc) && !current_is_kswapd() && sc->priority == DEF_PRIORITY);
+                                    DEF_PRIORITY에서 직접 회수 내의 전역 회수는 메모리 부족이 거의 없을 때 발생할 수 있는 정상적인 이벤트입니다. 
+                                    다중 스트리밍 리더/라이터. 따라서 우리가 직접 회수한다는 사실이 kswapd가 따라가지 못하고 
+                                    한 번에 일괄 작업을 수행하는 것이 가장 좋다는 것을 의미한다는 가정 하에 DEF_PRIORITY에서 스캔할 때 요청된 페이지 수를 회수할 때 스캔을 중단하지 않습니다.
+                                    memcg reclaim의 경우 첫 번째 패스에서 파일 또는 anon lru가 이미 0으로 떨어졌다면 비례 회수를 중단하기 위해 한 번의 검사가 수행됩니다.
+                                
+                                @ vmscan: second chance replacement for anonymous pages
+                                    - 원래는 LRU_ACTIVE_ANON 이 포함되어 있었음
+                                    while (nr[LRU_ACTIVE_ANON] || nr[LRU_INACTIVE_ANON] ||
+                                            nr[LRU_ACTIVE_FILE] || nr[LRU_INACTIVE_FILE]
+                                    - https://github.com/iamroot16/linux/commit/556adecba110bf5f1db6c6b56416cfab5bcab698
+                                </textarea>
+                            </li>
+                        </ol>
+                    </li>
+
                     <li>
                         <label for="menu-10-11">112 (2021-10-02) : v5.1 page reclaim 코어 리뷰 끝</label>
                         <input type="checkbox" id="menu-10-11" checked/>
