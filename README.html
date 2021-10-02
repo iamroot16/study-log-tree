@@ -2658,7 +2658,7 @@
 
                     <li>
                         <label for="menu-10-09">109 (2021-09-11) : v5.1 vmpressure, page reclaim 분석</label>
-                        <input type="checkbox" id="menu-10-09" checked/>
+                        <input type="checkbox" id="menu-10-09"/>
                         <ol>
                             <li class="file">
                                 <a href="">109 (2021-09-11) : v5.1 vmpressure, page reclaim 분석</a>
@@ -2801,39 +2801,315 @@
                     </li>
 
                     <li>
-                        <label for="menu-10-10">110 (2021-09-25) : </label>
+                        <label for="menu-10-10">110 (2021-09-25) : v5.1 page reclaim 코어 리뷰 </label>
                         <input type="checkbox" id="menu-10-10"/>
                         <ol>
                             <li class="file">
-                                <a href="">110 (2021-09-25) : </a>
-                                <textarea readonly>
-                                    
+                                <a href="">110 (2021-09-25) : v5.1 page reclaim 코어 리뷰 </a>
+                                <textarea rows="155" cols="200" readonly>
+                                참고: http://jake.dothome.co.kr/zonned-allocator-shrink-1/
+
+                                @ mm/vmscan.c::shrink_node()
+                                    node order로 구축한 zonelists
+                                    zone을 순회하면서 node가 같은 경우는 건너 뛴다. node base reclaim
+                                    - http://jake.dothome.co.kr/build_all_zonelists/
+                                
+                                    [PATCH 10/34] mm, vmscan: by default have direct reclaim only shrink once per node
+                                    : only shrink once per node.
+                                    /*
+                                    * Shrink each node in the zonelist once. If the
+                                    * zonelist is ordered by zone (not the default) then a
+                                    * node may be shrunk multiple times but in that case
+                                    * the user prefers lower zones being preserved.
+                                    */
+                                    if (zone->zone_pgdat == last_pgdat)
+                                        continue;
+                                    - https://lore.kernel.org/lkml/1467970510-21195-11-git-send-email-mgorman@techsingularity.net/
+                                
+                                    fallback list -> zone / node
+                                    - build_all_zonelists 참고: http://jake.dothome.co.kr/build_all_zonelists/
+                                
+                                    shrink_node() 에서 memcg = mem_cgroup_iter() 를 호출함
+                                    memcg 트리가 있고, do while 로 트리를 순회함
+                                    memcg는 노드 별로 있음
+                                
+                                @ mm/vmscan.c::shrink_node_memcg()
+                                    - kswapd & direct reclaim 에서 사용하는 node 별 페이지 할당 해제를 맡고 있습니다.
+                                    - This is a basic per-node page freer.  Used by both kswapd and direct reclaim.
+                                
+                                @memcg 별 파라미터 설정 관련
+                                    mm/vmscan.c::get_scan_count()
+                                    -> struct mem_cgroup *memcg,
+                                    - https://zetawiki.com/wiki/리눅스_swappiness
+                                    - https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memory.html
+                                
+                                @ free+file + inactive anon 관련 패치 정리
+                                    mm: consider whether to decivate based on eligible zones inactive ratio
+                                    scan control 이 인자로 들어온 패치
+                                    - https://github.com/iamroot16/linux/commit/f8d1a31163fcb3bf93f6c78770c3c1915f065bf9
+                                
+                                    mm: vmscan: reduce size of inactive file list
+                                    include/linux/memcontrol.h::mem_cgroup_inactive_anon_is_low() -> mm/vmscan.c::inactive_list_is_low() 로 리팩토링한 패치
+                                    - https://github.com/iamroot16/linux/commit/59dc76b0d4dfdd7dc46a1010e4afb44f60f3e97f
+                                
+                                    memcg: skip scanning active lists based on individual size
+                                    mm/memcontrol.c::calc_inactive_ratio() -> mm/memcontrol.c::mem_cgroup_inactive_anon_is_low()
+                                    - return inactive * inactive_ratio < active;
+                                    https://github.com/iamroot16/linux/commit/9b272977e3b99a8699361d214b51f98c8a9e0e7b
+                                
+                                
+                                    mm, vmscan: move LRU lists to node
+                                    - https://github.com/iamroot16/linux/commit/599d0c954f91d0689c9bb421b5bc04ea02437a41
+                                    mm, vmscan: move lru_lock to the node
+                                    - https://github.com/iamroot16/linux/commit/a52633d8e9c35832f1409dc5fa166019048a3f1f#diff-d503e0c4ef59449a7b9dd9f14c3f88b35578cdec99edbd05970e0599faf1c324
+                                
+                                    revert "mm: vmscan: do not swap anon pages just because free+file is low"
+                                    - https://github.com/iamroot16/linux/commit/623762517e2370be3b3f95f4fe08d6c063a49b06
+                                
+                                    memcg, vmscan: Fix forced scan of anonymous pages
+                                    - https://github.com/iamroot16/linux/commit/2ab051e11bfa3cbb7b24177f3d6aaed10a0d743e
+                                
+                                    mm, vmscan: move LRU lists to node
+                                    - https://github.com/iamroot16/linux/commit/599d0c954f91d0689c9bb421b5bc04ea02437a41
+                                
+                                    mm: vmscan: clean up get_scan_count()
+                                        enum scan_balance {
+                                            SCAN_EQUAL,
+                                            SCAN_FRACT,
+                                            SCAN_ANON,
+                                            SCAN_FILE,
+                                        }; 추가함
+                                    - https://github.com/iamroot16/linux/commit/9a2651140ef740b3b67ad47ea3d0af75581aacc6
+                                
+                                    mm: make get_scan_ratio() safe for memcg
+                                    - https://github.com/iamroot16/linux/commit/eeee9a8cd1e93c8b94e7788790fa9e2f8910c779
+                                
+                                    vmscan: split LRU lists into anon & file sets
+                                    - https://github.com/iamroot16/linux/commit/4f98a2fee8acdb4ac84545df98cccecfd130f8db
+                                
+                                    /* If we have very few page cache pages, force-scan anon pages. */
+                                    if (unlikely(file + free <= zone->pages_high))
+                                
+                                    static bool inactive_list_is_low(struct lruvec *lruvec, bool file -> (4) anon (5) file
+                                
+                                    @ rotate: LRU의 선두로 옮긴다.
+                                    - http://jake.dothome.co.kr/lru-lists-pagevecs/
+                                
+                                
+                                    @ shrink_node_memcg() 에서 사용하는 get_scan_ratio() 함수를 추가한 패치
+                                    - https://github.com/iamroot16/linux/commit/4f98a2fee8acdb4ac84545df98cccecfd130f8db#diff-d503e0c4ef59449a7b9dd9f14c3f88b35578cdec99edbd05970e0599faf1c324R1252
+                                    - 최초의 산식을 한번 살펴보자
+                                    /*
+                                     * With swappiness at 100, anonymous and file have the same priority.
+                                     * This scanning priority is essentially the inverse of IO cost.
+                                     */
+                                    anon_prio = sc->swappiness;
+                                    file_prio = 200 - sc->swappiness;
+                                
+                                    /*
+                                     *                  anon       recent_rotated[0]
+                                     * %anon = 100 * ----------- / ----------------- * IO cost
+                                     *               anon + file      rotate_sum
+                                     */
+                                    ap = (anon_prio + 1) * (zone->recent_scanned[0] + 1);
+                                    ap /= zone->recent_rotated[0] + 1;
+                                
+                                    fp = (file_prio + 1) * (zone->recent_scanned[1] + 1);
+                                    fp /= zone->recent_rotated[1] + 1;
+                                
+                                    /* Normalize to percentages */
+                                    percent[0] = 100 * ap / (ap + fp + 1);
+                                    percent[1] = 100 - percent[0];
+                                
+                                
+                                /*
+                                 * blk_plug permits building a queue of related requests by holding the I/O
+                                 * fragments for a short period. This allows merging of sequential requests
+                                 * into single larger request. As the requests are moved from a per-task list to
+                                 * the device's request_queue in a batch, this results in improved scalability
+                                 * as the lock contention for request_queue lock is reduced.
+                                 *
+                                 * It is ok not to disable preemption when adding the request to the plug list
+                                 * or when attempting a merge, because blk_schedule_flush_list() will only flush
+                                 * the plug list when the task sleeps by itself. For details, please see
+                                 * schedule() where blk_schedule_flush_plug() is called.
+                                 */
+                                struct blk_plug {
+                                    struct list_head mq_list; /* blk-mq requests */
+                                    struct list_head cb_list; /* md requires an unplug callback */
+                                    unsigned short rq_count;
+                                    bool multiple_queues;
+                                };
+                                
+                                @ blk_start_plug(&plug); ~ blk_finish_plug(&plug);
+                                    : 태스크의 plug에 blk_plug를 대입하여 배치 i/o가 시작 / 완료한 것을 알린다.
+                                
+                                @ scan_adjusted = (global_reclaim(sc) && !current_is_kswapd() && sc->priority == DEF_PRIORITY);
+                                    DEF_PRIORITY에서 직접 회수 내의 전역 회수는 메모리 부족이 거의 없을 때 발생할 수 있는 정상적인 이벤트입니다. 
+                                    다중 스트리밍 리더/라이터. 따라서 우리가 직접 회수한다는 사실이 kswapd가 따라가지 못하고 
+                                    한 번에 일괄 작업을 수행하는 것이 가장 좋다는 것을 의미한다는 가정 하에 DEF_PRIORITY에서 스캔할 때 요청된 페이지 수를 회수할 때 스캔을 중단하지 않습니다.
+                                    memcg reclaim의 경우 첫 번째 패스에서 파일 또는 anon lru가 이미 0으로 떨어졌다면 비례 회수를 중단하기 위해 한 번의 검사가 수행됩니다.
+                                
+                                @ vmscan: second chance replacement for anonymous pages
+                                    - 원래는 LRU_ACTIVE_ANON 이 포함되어 있었음
+                                    while (nr[LRU_ACTIVE_ANON] || nr[LRU_INACTIVE_ANON] ||
+                                            nr[LRU_ACTIVE_FILE] || nr[LRU_INACTIVE_FILE]
+                                    - https://github.com/iamroot16/linux/commit/556adecba110bf5f1db6c6b56416cfab5bcab698
                                 </textarea>
                             </li>
                         </ol>
                     </li>
 
                     <li>
-                        <label for="menu-10-11">111 (2021-10-02) : </label>
-                        <input type="checkbox" id="menu-10-11"/>
+                        <label for="menu-10-11">112 (2021-10-02) : v5.1 page reclaim 코어 리뷰 끝</label>
+                        <input type="checkbox" id="menu-10-11" checked/>
                         <ol>
                             <li class="file">
-                                <a href="">111 (2021-10-02) : </a>
-                                <textarea readonly>
-                                    
-                                </textarea>
-                            </li>
-                        </ol>
-                    </li>
+                                <a href="">112 (2021-10-02) : 1. shrink_page_list() 2. shrink_slab() 3. swap_tendency -> 현재 get_scan_count 비교</a>
+                                <textarea rows="150" cols="200" readonly>
 
-                    <li>
-                        <label for="menu-10-12">112 (2021-10-09) : </label>
-                        <input type="checkbox" id="menu-10-12"/>
-                        <ol>
-                            <li class="file">
-                                <a href="">112 (2021-10-09) : </a>
-                                <textarea readonly>
-                                    
+                                @ active > inactive
+                                 : shrink_active_list() return 0 으로 evictable 루프 한번 더 돈다.
+                                
+                                  isolate_mode 로 isolation 에 필터링 할 수 있음.
+                                  page_zonenum <-> sc->reclaim_index 로 zone movable dma dma32 를 구분하는 기능이 있음.
+                                
+                                  get_page_unless_zero(page)
+                                   -> ClearPageLRU(page);
+                                
+                                 [PATCH] vmscan: make mapped executable pages the first class citizen
+                                  - https://github.com/iamroot16/linux/commit/8cab4754d24a0f2e05920170c845bd84472814c6
+                                  - https://ko.wikipedia.org/wiki/일급_객체
+                                  - https://medium.com/@lazysoul/functional-programming-에서-1급-객체란-ba1aeb048059
+                                
+                                	/*
+                                	 * Identify referenced, file-backed active pages and
+                                	 * give them one more trip around the active list. So
+                                	 * that executable code get better chances to stay in
+                                	 * memory under moderate memory pressure.  Anon pages
+                                	 * are not likely to be evicted by use-once streaming
+                                	 * IO, plus JVM can create lots of anon VM_EXEC pages,
+                                	 * so we ignore them here.
+                                	 */
+                                	if ((vm_flags & VM_EXEC) && page_is_file_cache(page)) {
+                                		list_add(&page->lru, &l_active);
+                                		continue;
+                                	}
+                                
+                                @ active LRU를 앞쪽으로 옮겨주는 roatate 동작을 함.
+                                 안 쓰는 페이지들은 page testzero 를 해서 active list 회수에서 버디시스템으로 넣어줌
+                                
+                                	/*
+                                	 * Move pages back to the lru list.
+                                	 */
+                                	spin_lock_irq(&pgdat->lru_lock);
+                                	/*
+                                	 * Count referenced pages from currently used mappings as rotated,
+                                	 * even though only some of them are actually re-activated.  This
+                                	 * helps balance scan pressure between file and anonymous pages in
+                                	 * get_scan_count.
+                                	 */
+                                 reclaim_stat->recent_rotated[file] += nr_rotated;
+                                
+                                 nr_activate = move_active_pages_to_lru(lruvec, &l_active, &l_hold, lru);
+                                 nr_deactivate = move_active_pages_to_lru(lruvec, &l_inactive, &l_hold, lru - LRU_ACTIVE);
+                                 __mod_node_page_state(pgdat, NR_ISOLATED_ANON + file, -nr_taken);
+                                 spin_unlock_irq(&pgdat->lru_lock);
+                                
+                                 mem_cgroup_uncharge_list(&l_hold);
+                                 free_unref_page_list(&l_hold);
+                                
+                                @ 페이지 회수할 때 버디시스템으로 돌려줄 때 사용하는 방식
+                                 mem_cgroup_uncharge_list(&l_hold);
+                                 free_unref_page_list(&l_hold);
+                                
+                                 https://elixir.bootlin.com/linux/v5.1/source/fs/fs-writeback.c#L2024
+                                 /*
+                                  * Wakeup the flusher threads to start writeback of all currently dirty pages
+                                  */
+                                 void wakeup_flusher_threads(enum wb_reason reason)
+                                
+                                @ dirty page flush thread
+                                 - https://jihooyim1.gitbooks.io/linuxbasic/content/contents/10.html
+                                 커널 파라미터 별 조사
+                                 - https://m.blog.naver.com/skauter/10154080444
+                                
+                                @ LRU 테일에 위치한 페이지가 writeback 상태에 있을 때에 3가지 경우에 대해서 고민해야 합니다.
+                                 - If a page at the tail of the LRU is under writeback, there are three cases to consider.
+                                 1) 회수 시 쓰기 되돌림 중인 페이지 수가 너무 많고 이 페이지가 쓰기 되돌림 및 PageReclaim 하에 있는 경우
+                                 	페이지가 IO를 위해 대기 중이지만 IO가 완료될 수 있기 전에 LRU를 통해 재활용되고 있음을 나타냅니다.
+                                 	페이지 자체에서 기다리는 것은 IO 오류 또는 연결 해제된 스토리지로 인해 페이지 쓰기 저장이 불가능한 경우
+                                 	무기한 지연 위험이 있으므로 대신 LRU가 너무 빨리 스캔되고 호출자가 페이지 목록이 처리된 후 지연될 수 있습니다.
+                                 2) 전역 또는 새 memcg reclaim에서 즉시 회수로 표시되지 않은 페이지를 발견했습니다.
+                                 	또는 호출자에게 __GFP_FS(또는 fs가 아닌 단순히 스왑하려는 경우 __GFP_IO)가 없습니다.
+                                 	이 경우 즉시 회수할 페이지를 표시하고 스캔을 계속하십시오.
+                                 	아직 IO를 제출하지 않았을 수 있는 fs를 기다릴 것이기 때문에 may_enter_fs가 필요합니다.
+                                 	그리고 루프 드라이버는 쓰기를 수행하는 데 필요한 페이지에서 대기하는 경우 회수 및 교착 상태에 들어갈 수 있습니다
+                                 	(이런 이유로 루프는 __GFP_IO|__GFP_FS를 마스킹함).
+                                 	그러나 더 많은 생각은 아마도 더 많은 이유를 보여줄 것입니다.
+                                 3) 기존 memcg에서 이미 PageReclaim으로 표시된 페이지를 발견했습니다.
+                                 	memcg에는 더티 페이지 스로틀링이 없으므로 너무 많은 페이지가 writeback에 있고 회수할 다른 것이 없기 때문에 쉽게 OOM할 수 있습니다.
+                                 	쓰기 저장이 완료될 때까지 기다립니다.
+                                
+                                 1)과 2)의 경우 비활성 목록에서 깨끗한 페이지를 계속 검색하고 활성 목록에서 다시 채우는 동안 페이지를 활성화하여 방해가 되지 않도록 합니다.
+                                 여기서 관찰된 사실은 디스크 쓰기를 기다리는 것이 잠재적으로 라인을 다시 로드하는 것보다 비용이 더 많이 든다는 것입니다.
+                                 즉시 회수하도록 표시되어 있으므로 디스크에 기록하는 데 걸리는 시간보다 더 이상 캐시 작업 집합에 메모리 압력을 가하지 않습니다.
+                                
+                                 end_page_writeback()이 PageReclaim을 방금 지운 다음 여기에서 PageReclaim을 설정하면 
+                                 결국 PageReadahead로 해석될 수 있지만 신경 쓸 만큼 중요하지 않습니다.
+                                 우리가 원하는 것은 다음에 memcg reclaim이 위의 테스트에 도달할 때 
+                                 이 페이지에서 PageReclaim을 설정하는 것이므로 OOM을 피하기 위해 wait_on_page_writeback()이 수행됩니다.
+                                 또한 글로벌 회수에도 적합합니다.
+                                 
+                                 [PATCH] mm: vmscan: block kswapd if it is encountering pages under writeback
+                                 - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/vmscan.c?h=v3.11-rc1&id=283aba9f9e0e4882bf09bd37a2983379a6fae805
+                                
+                                  역사적으로 kswapd는 앞으로 진행되지 않는 경우 더 높은 우선 순위에서 혼잡 대기()를 사용했습니다.
+                                  진행 실패가 IO와 완전히 독립적일 수 있기 때문에 이는 의미가 없었습니다. 
+                                  이것은 나중에 wait_iff_congested()로 대체되었고 
+                                  커밋 258401a6(mm: balance_pgdat()의 혼잡한 영역에서 기다리지 마십시오)에 의해 완전히 제거되었습니다.
+                                  이는 shrink_inactive_list()에서 논리를 복제하기 때문입니다.
+                                  이것은 문제가 있습니다. kswapd가 쓰기 저장 중인 많은 페이지를 발견하고 상위 워터마크에 도달할 때까지 계속 스캔하면 
+                                  쓰기 저장 중인 페이지를 빠르게 건너뛰고 깨끗한 어린 페이지를 회수하거나 응용 프로그램을 스왑으로 푸시합니다.
+                                  wait_iff_congested() 사용은 기본 BDI가 실제로 혼잡하거나 직접 회수자가 기본 BDI에 쓸 수 없는 경우에만 중단되므로 kswapd에 적합하지 않습니다.
+                                  kswapd는 PF_SWAPWRITE를 설정할 때 BDI 혼잡을 우회하지만 이를 고려하더라도 직접 회수자가 쓰기 저장 시 지연되는 원인이 되므로 바람직하지 않습니다.
+                                 
+                                 이 패치는 직접 회수 또는 kswapd가 쓰기 저장에서 너무 많은 페이지를 만나는 경우 ZONE_WRITEBACK 플래그를 설정합니다. 
+                                 이 플래그가 설정되고 kswapd가 쓰기 되돌림에서 PageReclaim 페이지를 발견하면 
+                                 IO가 완료되기 전에 LRU 목록이 너무 빨리 재활용되고 있다고 가정하고 일부 IO가 완료되기를 기다리는 것을 차단합니다.
+                                
+                                @ v2.6.11 shrinker은 원래 vmscan.c 에 있었음.
+                                 : https://elixir.bootlin.com/linux/v2.6.11/source/mm/vmscan.c#L177
+                                
+                                @ v5.1 shrinker
+                                 : https://elixir.bootlin.com/linux/v5.11/source/include/linux/shrinker.h#L60
+                                  - http://jake.dothome.co.kr/zonned-allocator-shrink-2/
+                                
+                                 (1) zsmalloc
+                                  - https://www.kernel.org/doc/html/latest/vm/zsmalloc.html
+                                
+                                 shrinker 구조체
+                                 - https://elixir.bootlin.com/linux/v5.11/source/include/linux/shrinker.h#L60
+                                 (2) ext4/extents_status.c
+                                  shrinker free 관련 컬백을 kmem_cache_* 관련 해서 살펴볼 수 있다.
+                                  slab을 free 할 때 init 할 때 만들어놓은 extent_status slab으로 만든다.
+                                
+                                 (3) fs/nfs
+                                  역시나 scan_object 로 scan 하고 free 함!
+                                
+                                @ memcg 보기 위한 준비
+                                 (1) 공식 문서
+                                 - https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/
+                                 - https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/cgroups.html
+                                 - https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memcg_test.html
+                                 - https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v1/memory.html
+                                
+                                 (2) mm/memcontrol.c 처음 들어온 패치
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=8cdea7c05454260c0d4d83503949c358eb131d17
+                                
+                                 (3) memory controller: soft limit reclaim on contention
+                                  v2.6.32-rc1 mem_cgroup_soft_limit_reclaim() 함수를 추가함
+                                  - https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/commit/mm/memcontrol.c?h=v2.6.32-rc1&id=4e41695356fb4e0b153be1440ad027e46e0a7ea2
                                 </textarea>
                             </li>
                         </ol>
