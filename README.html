@@ -3143,7 +3143,7 @@
         금방 뒤따르는 페이지 폴트에 추가적으로 처리해야합니다. 
         - https://www.kernel.org/doc/html/latest/admin-guide/sysctl/vm.html#page-cluster
 
-       @ $ cho 64 > /sys/block/<disk_subsystem>/queue/read_ahead_kb
+       @ $ echo 64 > /sys/block/<disk_subsystem>/queue/read_ahead_kb
          large streaming read의 경우 read ahead buffer의 크기
         - https://m.blog.naver.com/jindogg/30186663821
 
