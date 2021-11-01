@@ -143,7 +143,7 @@
         <li class="file"><a href="">002 (2019-06-01) : 리눅스 커널 내부구조 - 3장 태스크 관리, 4장 메모리 관리 </a></li>
         <li class="file">
             <a href="">003 (2019-06-08) : 리눅스 커널 내부구조 - 5장 파일시스템과 가상 파일시스템</a>
-            <textarea readonly rows="24" cols="128">
+            <textarea readonly rows="32" cols="128">
             (1) 파일시스템 질문: 136p FAT 파일 중간데이터를 읽을때, 
                 처음 블록부터 읽을 필요가없다고 나와있는데, 어떻게?
                 - FAT파일 시스템도 "인덱스 블록 기법" 처럼 블록 위치를 테이블로 관리함.
@@ -171,7 +171,7 @@
         </li>
         <li class="file">
             <a href="">004 (2019-06-15) : 리눅스 커널 내부구조 - 5장 파일시스템과 가상 파일시스템, 6장 인터럽트와 트랩 그리고 시스템 호출</a>
-            <textarea readonly rows="16" cols="150">
+            <textarea readonly rows="32" cols="150">
             (1) 5장 파일시스템 질문(1조 이파란) : 156p sys_open() vs sys_read() 의 기능적 차이점
                 - Functions like open() , printf() , scanf() , read() are library function 
                     implemented on top of their sys_* counterparts. 
@@ -251,7 +251,7 @@
             </p>
 
             <p>
-                <textarea readonly rows="24" cols="128">
+                <textarea readonly rows="32" cols="128">
                 (1) Arm 리눅스 커널 1장 (1조 이파란)
                     : 5p 하이퍼바이저와 보안모니터의 주체 (하드웨어적? 소프트웨어적으로? 펌웨어?)
                     - hypervisor mode desciptions : 2140 PAGE
@@ -279,7 +279,7 @@
         </li>
         <li class="file">
             <a href="">006 (2019-06-29) : Arm 리눅스 커널 2판 - 1.5 MMU</a>
-            <textarea readonly rows="14" cols="160">
+            <textarea readonly rows="32" cols="160">
             (1) AArch64 디스크립터 타입 중 테이블 엔트리 포맷?
                 - http://jake.dothome.co.kr/pt64/
             (2) ARM 리눅스 커널 1장 (2조 최자은) : 
@@ -303,7 +303,7 @@
     <ol>
         <li class="file">
             <a href="">007 (2019-07-06) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="26" cols="128">
+            <textarea readonly rows="32" cols="128">
             * 항상 업데이트 되는 Arm v8 매뉴얼 링크
             - https://kib.kiev.ua/x86docs/ARM/
 
@@ -331,7 +331,7 @@
 
         <li class="file">
             <a href="">008 (2019-07-13) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="56" cols="128">
+            <textarea readonly rows="64" cols="128">
             ENTRY(el2_setup)
 
             * Arm 베리어 관련 정리 내용 공유
@@ -388,7 +388,7 @@
 
         <li class="file">
             <a href="">009 (2019-07-20) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="16" cols="128">
+            <textarea readonly rows="24" cols="128">
             * MT_NORMAL
             - http://jake.dothome.co.kr/map64/
 
@@ -420,7 +420,7 @@
 
         <li class="file">
             <a href="">011 (2019-08-03) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="20" cols="150">
+            <textarea readonly rows="32" cols="150">
             compute_indices
             - populate_entries
 
@@ -610,7 +610,7 @@
 
         <li class="file">
             <a href="">013 (2019-08-24) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="3" cols="128">
+            <textarea readonly rows="4" cols="128">
             * tst    x23, ~(MIN_KIMG_ALIGN - 1) 에 대한 커밋 내용
             - http://lists.infradead.org/pipermail/linux-arm-kernel/2016-March/413173.html
             </textarea>
@@ -618,7 +618,7 @@
 
         <li class="file">
             <a href="">014 (2019-08-31) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="20" cols="128">
+            <textarea readonly rows="32" cols="128">
             * Low level Exception
             - https://s-matyukevich.github.io/raspberry-pi-os/docs/lesson03/linux/low_level-exception_handling.html
 
@@ -640,7 +640,7 @@
 
         <li class="file">
             <a href="">015 (2019-09-21) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="40" cols="150">
+            <textarea readonly rows="64" cols="150">
             * static unsigned int array[10] = { [0] = 5, [1] = 5, [2] = 5, [3] = 5, [4] = 5, [5] = 5, [6] = 5, [7] = 5, [8] = 5, [9] = 5};
             * static unsigned int array[10] = { [ 0 ... 9 ] = 5 };
             * _Bool lowercase_eh(char c)
@@ -683,7 +683,7 @@
 
         <li class="file">
             <a href="">016 (2019-09-28) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="50" cols="128">
+            <textarea readonly rows="64" cols="128">
             * DEFINE_PER_CPU_SECTION 관련
             - https://0xax.gitbooks.io/linux-insides/content/Concepts/linux-cpu-1.html
 
@@ -732,7 +732,7 @@
 
         <li class="file">
             <a href="">017 (2019-09-30) : arch/arm64/kernel/head.S</a>
-            <textarea readonly rows="3" cols="128">
+            <textarea readonly rows="4" cols="128">
             * statement expression 관련
             - http://lvzuufx.blogspot.com/2015/07/c-gcc.html
             </textarea>
@@ -760,7 +760,7 @@
     <ol>
         <li class="file">
             <a href="">019 (2019-10-12) : arch/arm64/mm/mmu.c::early_fixmap_init()</a>
-            <textarea readonly rows="40" cols="150">
+            <textarea readonly rows="64" cols="150">
             * atomic64_or
             - include/asm-generic/atomic-long.h 
                 -> include/asm-generic/atomic64.h 
@@ -802,7 +802,7 @@
 
         <li class="file">
             <a href="">020 (2019-10-26) : arch/arm64/mm/ioremap.c::early_ioremap_init()</a>
-            <textarea readonly rows="16" cols="128">
+            <textarea readonly rows="24" cols="128">
             early_ioremap_init() (arch/arm64/mm/ioremap.c)
             - early_ioremap_setup() (mm/early_ioremap.c)
             -- __fix_to_virt() (include/asm-generic/fixmap.h)
