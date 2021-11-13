@@ -3469,8 +3469,181 @@
 
 <li class="file">
     <a href="">115 (2021-10-23) : 노드 별 memcg iter </a>
-    <textarea rows="10" cols="128" readonly>
-    @ 
+    <textarea rows="176" cols="128" readonly>
+    @ 주요 구조체
+    // include/linux/sched.h
+    struct task_struct {
+    // ...
+    #ifdef CONFIG_CGROUPS
+        /* Control Group info protected by css_set_lock: */
+        struct css_set __rcu		*cgroups;
+    // ...
+    }
+
+    // include/linux/cgroup-defs.h
+    /*
+     * A css_set is a structure holding pointers to a set of
+     * cgroup_subsys_state objects. This saves space in the task struct
+     * object and speeds up fork()/exit(), since a single inc/dec and a
+     * list_add()/del() can bump the reference count on the entire cgroup
+     * set for a task.
+     */
+    struct css_set {
+    
+    // ...
+    
+    }
+
+    /*
+     * per-zone information in memory controller.
+     */
+    struct mem_cgroup_per_node {
+        struct lruvec		lruvec;
+    
+        struct lruvec_stat __percpu *lruvec_stat_cpu;
+        atomic_long_t		lruvec_stat[NR_VM_NODE_STAT_ITEMS];
+    
+        unsigned long		lru_zone_size[MAX_NR_ZONES][NR_LRU_LISTS];
+    
+        struct mem_cgroup_reclaim_iter	iter[DEF_PRIORITY + 1];
+    
+    #ifdef CONFIG_MEMCG_KMEM
+        struct memcg_shrinker_map __rcu	*shrinker_map;
+    #endif
+        struct rb_node		tree_node;	/* RB tree node */
+        unsigned long		usage_in_excess;/* Set to the value by which */
+                            /* the soft limit is exceeded*/
+        bool			on_tree;
+        bool			congested;	/* memcg has many dirty pages */
+                            /* backed by a congested BDI */
+    
+        struct mem_cgroup	*memcg;		/* Back pointer, we cannot */
+                            /* use container_of	   */
+    };
+    
+    struct mem_cgroup_reclaim_iter {
+        struct mem_cgroup *position;
+        /* scan generation, increased every round-trip */
+        unsigned int generation;
+    };
+
+    /**
+     * mem_cgroup_iter - iterate over memory cgroup hierarchy
+     * @root: hierarchy root
+     * @prev: previously returned memcg, NULL on first invocation
+     * @reclaim: cookie for shared reclaim walks, NULL for full walks
+     *
+     * Returns references to children of the hierarchy below @root, or
+     * @root itself, or %NULL after a full round-trip.
+     *
+     * Caller must pass the return value in @prev on subsequent
+     * invocations for reference counting, or use mem_cgroup_iter_break()
+     * to cancel a hierarchy walk before the round-trip is complete.
+     *
+     * Reclaimers can specify a node and a priority level in @reclaim to
+     * divide up the memcgs in the hierarchy among all concurrent
+     * reclaimers operating on the same node and priority.
+     */
+    struct mem_cgroup *mem_cgroup_iter(struct mem_cgroup *root,
+                       struct mem_cgroup *prev,
+                       struct mem_cgroup_reclaim_cookie *reclaim)
+    
+     1. mem_cgroup_per_node -> 노드에서 처음으로 순회할 root memcgroup 을 뽑는다.
+     2. 해당 root memcgroup 의 < css 가 속한 트리 (<- 이게 같은 노드에 있다는거야?) 를 순회하면서> 해당 css 의 주인인 memcgroup 을 뽑는다.
+     3. 
+     4. struct mem_cgroup *mem_cgroup_iter
+    
+     . mem_cgroup_per_node.lruvec 을 page reclaim !
+     . 해당 노드에 회수 완료함.
+
+    @ mem_cgroup_protected
+     (1) MEMCG_PROT_NONE:
+      cgroup memory is not protected
+    
+     (2) MEMCG_PROT_LOW: 
+      cgroup memory is protected as long there is an unprotected supply of reclaimable memory from other cgroups.
+         
+     (3) MEMCG_PROT_MIN:
+      cgroup memory is protected
+
+    @ mem_cgroup.memory.[] 
+    # include/linux/memcontrol.h
+     struct mem_cgroup {
+         struct cgroup_subsys_state css;
+     
+         /* Private memcg ID. Used to ID objects that outlive the cgroup */
+         struct mem_cgroup_id id;
+     
+         /* Accounted resources */
+         struct page_counter memory;
+     
+     struct mem_cgroup {
+         struct cgroup_subsys_state css;
+     
+         /* Accounted resources */
+         struct page_counter memory;
+         // ....
+     }
+
+    @ @ 설정 파라미터 항목들과의 연계를 확인해보자
+     # include/linux/page_counter.h
+     struct page_counter {
+         atomic_long_t usage;
+         unsigned long min;
+         unsigned long low;
+         unsigned long max;
+         struct page_counter *parent;
+     
+         /* effective memory.min and memory.min usage tracking */
+         unsigned long emin;
+         atomic_long_t min_usage;
+         atomic_long_t children_min_usage;
+     
+         /* effective memory.low and memory.low usage tracking */
+         unsigned long elow;
+         atomic_long_t low_usage;
+         atomic_long_t children_low_usage;
+     
+         /* legacy */
+         unsigned long watermark;
+         unsigned long failcnt;
+     };
+
+    @ ls /sys/fs/cgroup/memory/memory.*
+     /sys/fs/cgroup/memory/memory.failcnt
+     /sys/fs/cgroup/memory/memory.force_empty
+     /sys/fs/cgroup/memory/memory.kmem.failcnt
+     /sys/fs/cgroup/memory/memory.kmem.limit_in_bytes
+     /sys/fs/cgroup/memory/memory.kmem.max_usage_in_bytes
+     /sys/fs/cgroup/memory/memory.kmem.slabinfo
+     /sys/fs/cgroup/memory/memory.kmem.tcp.failcnt
+     /sys/fs/cgroup/memory/memory.kmem.tcp.limit_in_bytes
+     /sys/fs/cgroup/memory/memory.kmem.tcp.max_usage_in_bytes
+     /sys/fs/cgroup/memory/memory.kmem.tcp.usage_in_bytes
+     /sys/fs/cgroup/memory/memory.kmem.usage_in_bytes
+     /sys/fs/cgroup/memory/memory.limit_in_bytes
+     /sys/fs/cgroup/memory/memory.max_usage_in_bytes
+     /sys/fs/cgroup/memory/memory.memsw.failcnt
+     /sys/fs/cgroup/memory/memory.memsw.limit_in_bytes
+     /sys/fs/cgroup/memory/memory.memsw.max_usage_in_bytes
+     /sys/fs/cgroup/memory/memory.memsw.usage_in_bytes
+     /sys/fs/cgroup/memory/memory.move_charge_at_immigrate
+     /sys/fs/cgroup/memory/memory.numa_stat
+     /sys/fs/cgroup/memory/memory.oom_control
+     /sys/fs/cgroup/memory/memory.pressure_level
+     /sys/fs/cgroup/memory/memory.soft_limit_in_bytes
+     /sys/fs/cgroup/memory/memory.stat
+     /sys/fs/cgroup/memory/memory.swappiness
+     /sys/fs/cgroup/memory/memory.usage_in_bytes
+     /sys/fs/cgroup/memory/memory.use_hierarchy
+
+    
+    @ 해당 cgroup에는 memory.min 만큼의 메모리 양은 항상 reclaim 하지 않고 유지한다.
+     min < x <low 일때는 최 후순위
+     나머지는 회수 진행!
+
+    shrink_node_memcg() ->
+    struct lruvec *lruvec = mem_cgroup_lruvec(pgdat, memcg);
     </textarea>
     <br>
 </li></ol>
@@ -3479,19 +3652,291 @@
 <label for="menu-13">week [115] : slub </label>
 <input type="checkbox" id="menu-13" checked/>
 <ol><li class="file">
-    <a href="">115 (2021-10-23) : slub 개론 </a>
-    <textarea rows="100" cols="128" readonly>
+    <a href="">115 (2021-10-23) : slub ~ </a>
+    <textarea rows="76" cols="128" readonly>
     @ 문C 블로그: Slab Memory Allocator -1- (구조)
      - http://jake.dothome.co.kr/slub/
+
+    @ 슬랩 캐시
+     struct kmem_cache
+
+     ~$ sudo cat /proc/slabinfo
+     slabinfo - version: 2.1
+     # name            <active_objs> <num_objs> <objsize> <objperslab> <pagesperslab> : tunables <limit> <batchcount> <sharedfactor> : slabdata <active_slabs> <num_slabs> <sharedavail>
+     kvm_vcpu               0      0  10720    3    8 : tunables    0    0    0 : slabdata      0      0      0
+     kvm_mmu_page_header      0      0    168   24    1 : tunables    0    0    0 : slabdata      0      0      0
+     x86_emulator           0      0   2672   12    8 : tunables    0    0    0 : slabdata      0      0      0
+     x86_fpu                0      0   4160    7    8 : tunables    0    0    0 : slabdata      0      0      0
+     ext4_groupinfo_4k  14924  14924    144   28    1 : tunables    0    0    0 : slabdata    533    533      0
+     scsi_sense_cache     576    576    128   32    1 : tunables    0    0    0 : slabdata     18     18      0
+     fsverity_info          0      0    256   32    2 : tunables    0    0    0 : slabdata      0      0      0
+     fscrypt_info           0      0    136   30    1 : tunables    0    0    0 : slabdata      0      0      0
+     MPTCPv6                0      0   2048   16    8 : tunables    0    0    0 : slabdata      0      0      0
+     ip6-frags              0      0    184   44    2 : tunables    0    0    0 : slabdata      0      0      0
+     PINGv6                 0      0   1216   26    8 : tunables    0    0    0 : slabdata      0      0      0
+     RAWv6                780    780   1216   26    8 : tunables    0    0    0 : slabdata     30     30      0
+     UDPv6                384    384   1344   24    8 : tunables    0    0    0 : slabdata     16     16      0
+     tw_sock_TCPv6          0      0    248   33    2 : tunables    0    0    0 : slabdata      0      0      0
+     request_sock_TCPv6      0      0    304   26    2 : tunables    0    0    0 : slabdata      0      0      0
+     TCPv6                156    156   2432   13    8 : tunables    0    0    0 : slabdata     12     12      0
+     kcopyd_job             0      0   3312    9    8 : tunables    0    0    0 : slabdata      0      0      0
+     dm_uevent              0      0   2888   11    8 : tunables    0    0    0 : slabdata      0      0      0
+     mqueue_inode_cache    306    306    960   34    8 : tunables    0    0    0 : slabdata      9      9      0
+     fuse_request         156    156    152   26    1 : tunables    0    0    0 : slabdata      6      6      0
+     fuse_inode           156    156    832   39    8 : tunables    0    0    0 : slabdata      4      4      0
+     fat_cache              0      0     40  102    1 : tunables    0    0    0 : slabdata      0      0      0
+     ext4_extent_status  95574  95574     40  102    1 : tunables    0    0    0 : slabdata    937    937      0
+     task_delay_info     7261   7344     80   51    1 : tunables    0    0    0 : slabdata    144    144      0
+     taskstats            736    736    352   46    4 : tunables    0    0    0 : slabdata     16     16      0
+     proc_dir_entry      2436   2436    192   42    2 : tunables    0    0    0 : slabdata     58     58      0
+     pde_opener          1632   1632     40  102    1 : tunables    0    0    0 : slabdata     16     16      0
+     proc_inode_cache   11767  11952    680   24    4 : tunables    0    0    0 : slabdata    498    498      0
+     seq_file             544    544    120   34    1 : tunables    0    0    0 : slabdata     16     16      0
+     bdev_cache           240    240   1600   20    8 : tunables    0    0    0 : slabdata     12     12      0
+     shmem_inode_cache   5614   5670    720   45    8 : tunables    0    0    0 : slabdata    126    126      0
+     kernfs_node_cache  63926  65248    128   32    1 : tunables    0    0    0 : slabdata   2039   2039      0
+     mnt_cache           5100   5100    320   25    2 : tunables    0    0    0 : slabdata    204    204      0
+     filp               17083  19040    256   32    2 : tunables    0    0    0 : slabdata    595    595      0
+     inode_cache        36192  36192    608   26    4 : tunables    0    0    0 : slabdata   1392   1392      0
+     dentry            299040 299040    192   42    2 : tunables    0    0    0 : slabdata   7120   7120      0
+     names_cache          176    176   4096    8    8 : tunables    0    0    0 : slabdata     22     22      0
+     iint_cache             0      0    120   34    1 : tunables    0    0    0 : slabdata      0      0      0
+     kmalloc-rcl-16         0      0     16  256    1 : tunables    0    0    0 : slabdata      0      0      0
+     kmalloc-rcl-8          0      0      8  512    1 : tunables    0    0    0 : slabdata      0      0      0
+     kmalloc-8k           320    320   8192    4    8 : tunables    0    0    0 : slabdata     80     80      0
+     kmalloc-4k          3188   3208   4096    8    8 : tunables    0    0    0 : slabdata    401    401      0
+     kmalloc-2k          4136   4208   2048   16    8 : tunables    0    0    0 : slabdata    263    263      0
+     kmalloc-1k          5130   5344   1024   32    8 : tunables    0    0    0 : slabdata    167    167      0
+     kmalloc-512        27634  27872    512   32    4 : tunables    0    0    0 : slabdata    871    871      0
+     kmalloc-256        15686  15904    256   32    2 : tunables    0    0    0 : slabdata    497    497      0
+     kmalloc-192         8581   8946    192   42    2 : tunables    0    0    0 : slabdata    213    213      0
+     kmalloc-128         6406   7072    128   32    1 : tunables    0    0    0 : slabdata    221    221      0
+     kmalloc-96          8538   9156     96   42    1 : tunables    0    0    0 : slabdata    218    218      0
+     kmalloc-64         25037  25984     64   64    1 : tunables    0    0    0 : slabdata    406    406      0
+     kmalloc-32         45184  45184     32  128    1 : tunables    0    0    0 : slabdata    353    353      0
+     kmalloc-16         19200  19200     16  256    1 : tunables    0    0    0 : slabdata     75     75      0
+     kmalloc-8          17408  17408      8  512    1 : tunables    0    0    0 : slabdata     34     34      0
+     kmem_cache_node      576    576     64   64    1 : tunables    0    0    0 : slabdata      9      9      0
+     kmem_cache           320    320    256   32    2 : tunables    0    0    0 : slabdata     10     10      0
+
+    @ slabdata <active_slabs> <num_slabs> 가 0 이거나 아니면 같음
+     만약 54바이트만몸 메모리 할당을 요청하면 커널 내부의 슬럽 메모리 할당자가 64바이트만큼
+     메모리를 할당해줍니다. 이때 kmalloc-64 슬랩 캐시가 동작하게 됩니다.    
     </textarea>
     <br>
 </li>
 
 <li class="file">
     <a href="">116 (2021-10-30) : init/main.c::mm_init() -> mm/slub.c::kmem_cache_init()</a>
-    <textarea rows="100" cols="128" readonly>
+    <textarea rows="96" cols="128" readonly>
     @ Slab Memory Allocator -2- (캐시 초기화)
      - http://jake.dothome.co.kr/kmem_cache_init/
+    
+    /*
+    * calculate_sizes() determines the order and the distribution of data within
+    * a slab object.
+    */
+    static int calculate_sizes(struct kmem_cache *s, int forced_order)
+
+    @ include/linux/slab.h
+
+    @ mm/slub.c
+     void __init kmem_cache_init(void)
+     slab_state = PARTIAL;
+
+    @ mm/slab_common.c
+     init_kmem_cache_nodes()
+      ->early_kmem_cache_node_alloc
+      -> new_slab
+
+    static struct page *new_slab(struct kmem_cache *s, gfp_t flags, int node)
+     -> return allocate_slab(s, flags & (GFP_RECLAIM_MASK | GFP_CONSTRAINT_MASK), node);
+     -> page = alloc_slab_page(s, alloc_gfp, node, oo);
+
+    @ memcg 가 관리하게 함
+     memcg_charge_slab
+     -> memcg_kmem_charge_memcg
+      -> memcg_kmem_enabled()
+       -> memcg_kmem_charge_memcg // include/linux/memcontrol.h
+        -> __memcg_kmem_charge_memcg // mm/memcontrol.c
+         -> try_charge()
+
+     에러가 났으면 __free_ 함
+     static struct page *allocate_slab(struct kmem_cache *s, gfp_t flags, int node)
+     함수가 static 이면 해당 함수를 해당 파일에서만 씀.
+     두번 시도하는데, 한번에 오더 요청이 안되면, 점진적이 아니라 바로 최소로 낮춰서 버디에 요청함.
+
+    oo = s->min;
+    /*
+    * Allocation may have failed due to fragmentation.
+    * Try a lower order alloc if possible
+    */
+    page = alloc_slab_page(s, alloc_gfp, node, oo);
+
+
+    @ kmem_cache_open()
+      -> init_kmem_cache_nodes(s)
+      -> alloc_kmem_cache_cpus(s)
+     에러 처리하려고 free_kmem_cache_nodes(s); 하는 부분은 나중에 해제 할 때 보자.
+    
+    nr_node_ids vs struct kmem_cache_node *node[MAX_NUMNODES];
+
+    static int init_kmem_cache_nodes(struct kmem_cache *s)
+    {
+        int node;
+
+        for_each_node_state(node, N_NORMAL_MEMORY) {
+            struct kmem_cache_node *n;
+
+            if (slab_state == DOWN) { // 
+                early_kmem_cache_node_alloc(node);
+                continue;
+            }
+            n = kmem_cache_alloc_node(kmem_cache_node,
+                            GFP_KERNEL, node);
+
+            if (!n) {
+                free_kmem_cache_nodes(s);
+                return 0;
+            }
+
+            init_kmem_cache_node(n);
+            s->node[node] = n;
+        }
+        return 1;
+    }
+
+    void *kmem_cache_alloc_node(struct kmem_cache *cachep, gfp_t flags, int nodeid)
+
+    @ 참고 (문C 블로그)
+    - http://jake.dothome.co.kr/slub-slub-alloc/
+    - https://www.kernel.org/doc/html/v4.13/dev-tools/kasan.html
+    - http://jake.dothome.co.kr/per-cpu-page-frame-cache/
+    - http://jake.dothome.co.kr/per-cpu-dynamic/
+
+    @ 사용하는 총 노드 배열 까지만 다 계산함
+     - kmem_cache_node가 맨 마지막 멤버라서 offsetof()로 kmem_cache의 kmem_cache_node 직전까지의 size 
+     - http://jake.dothome.co.kr/slub-object-alloc/
+    </textarea>
+    <br>
+</li><li class="file">
+    <a href="">117 (2021-11-06) : init/main.c::mm_init() -> mm/slub.c</a>
+    <textarea rows="116" cols="128" readonly>
+        1. 빈번한 생성과 소멸 대신 재사용하자! -> 초기화 오버헤드를 줄이자
+
+        @ [PATCH] preemtion on/off + barrier
+        - https://github.com/iamroot16/linux/commit/9aabf810a67cd97e2d1a48f0bab338b7680f1929
+        
+        @ [PATCH] lockless
+        - https://github.com/iamroot16/linux/commit/8a5ec0ba42c4919e2d8f4c3138cc8b987fdb0b79
+        
+        @ [PATCH] slub: Rework allocator fastpaths
+         Rework the allocation paths so that updates of the page freelist, frozen state
+         and number of objects use cmpxchg_double_slab().
+         - https://github.com/iamroot16/linux/commit/2cfb7455d223ab24b23df44be430faf92e12390f
+
+        /*
+         * Check the page->freelist of a page and either transfer the freelist to the
+         * per cpu freelist or deactivate the page.
+         *
+         * The page is still frozen if the return value is not NULL.
+         *
+         * If this function returns NULL then the page has been unfrozen.
+         *
+         * This function must be called with interrupt disabled.
+         */
+        static inline void *get_freelist(struct kmem_cache *s, struct page *page)
+        {
+            struct page new;
+            unsigned long counters;
+            void *freelist;
+        
+            do {
+                freelist = page->freelist;
+                counters = page->counters;
+        
+                new.counters = counters;
+                VM_BUG_ON(!new.frozen);
+        
+                new.inuse = page->objects;
+                new.frozen = freelist != NULL;
+        
+            } while (!__cmpxchg_double_slab(s, page,
+                freelist, counters,
+                NULL, new.counters,
+                "get_freelist"));
+        
+            return freelist;
+        }
+
+        @ include/linux/bit_spinlock.h
+        
+         /*
+          *  bit-based spin_lock()
+          *
+          * Don't use this unless you really need to: spin_lock() and spin_unlock()
+          * are significantly faster.
+          */
+         static inline void bit_spin_lock(int bitnum, unsigned long *addr)
+         {
+             /*
+              * Assuming the lock is uncontended, this never enters
+              * the body of the outer loop. If it is contended, then
+              * within the inner loop a non-atomic test is used to
+              * busywait with less bus contention for a good time to
+              * attempt to acquire the lock bit.
+              */
+             preempt_disable();
+         #if defined(CONFIG_SMP) || defined(CONFIG_DEBUG_SPINLOCK)
+             while (unlikely(test_and_set_bit_lock(bitnum, addr))) {
+                 preempt_enable();
+                 do {
+                     cpu_relax();
+                 } while (test_bit(bitnum, addr));
+                 preempt_disable();
+             }
+         #endif
+             __acquire(bitlock);
+         }
+
+        @ include/linux/spinlock_api_smp.h
+        
+         static inline void __raw_spin_lock(raw_spinlock_t *lock)
+         {
+             preempt_disable();
+             spin_acquire(&lock->dep_map, 0, 0, _RET_IP_);
+             LOCK_CONTENDED(lock, do_raw_spin_trylock, do_raw_spin_lock);
+         }
+
+        cpu 0 --------- cpu 1
+        (               (
+          process0         process1
+           -> process1     -> process2
+           -> process0     -> process0
+           -> process2     -> process0
+           -> process3     -> process3
+        )                )
+        tid -> cpu 도 구분하고
+        task_struct id?
+        transaction -> 처리 순서가 필요함
+        -> 나중에 발생한 사건이 먼저 큐에 들어가 있어서 먼저 처리되면 안된다.
+
+        인터럽트 요청에 슬랩 요청이 있다?
+        인터럽트 PID 가 처리할 때 애매함.
+
+        슬랩 캐시 공유 자원임 == 한 계좌에 있는 돈
+
+        tid 가 -- ++ 안나왔고
+        tid 다르다의 존재 => 프로세스 & 인터럽트 루틴을 처리하고 싶어서
+        제가 Union의 개념을 잘 모르는걸까요? new.inuse = page->objects 는 무슨 의미에요?
+        new.objects = page->objects 가 왜 아닐까요?
+        같은 페이지 디스크립터인데....
+
+        슬랩 페이지를 처음 할당 받은 후 모든 free object들이 c->freelist에 연결하므로
+        page->inuse 값에 page->objects 수를 대입하여 모두 사용 중으로 표기한다.
+
+        get_partial_node() -> put_cpu_partial
+
     </textarea>
     <br>
 </li></ol>
