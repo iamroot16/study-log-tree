@@ -3919,23 +3919,195 @@
         tid -> cpu 도 구분하고
         task_struct id?
         transaction -> 처리 순서가 필요함
-        -> 나중에 발생한 사건이 먼저 큐에 들어가 있어서 먼저 처리되면 안된다.
+         -> 나중에 발생한 사건이 먼저 큐에 들어가 있어서 먼저 처리되면 안된다.
+         슬랩 캐시 공유 자원임 == 한 계좌에 있는 돈
 
-        인터럽트 요청에 슬랩 요청이 있다?
-        인터럽트 PID 가 처리할 때 애매함.
+         인터럽트 요청에 슬랩 요청이 있다?
+         인터럽트 PID 가 처리할 때 애매함.
 
-        슬랩 캐시 공유 자원임 == 한 계좌에 있는 돈
+         tid 가 -- ++ 안나왔고
+         tid 다르다의 존재 => 프로세스 & 인터럽트 루틴을 처리하고 싶어서
 
-        tid 가 -- ++ 안나왔고
-        tid 다르다의 존재 => 프로세스 & 인터럽트 루틴을 처리하고 싶어서
-        제가 Union의 개념을 잘 모르는걸까요? new.inuse = page->objects 는 무슨 의미에요?
-        new.objects = page->objects 가 왜 아닐까요?
-        같은 페이지 디스크립터인데....
+        @ new.inuse = page->objects 는 같은 페이지 디스크립터인데 무슨 의미일까?
+         - 슬랩 페이지를 처음 할당 받은 후 모든 free object들이 c->freelist에 연결하므로
+           page->inuse 값에 page->objects 수를 대입하여 모두 사용 중으로 표기한다.
+           get_partial_node() -> put_cpu_partial
+    </textarea>
+    <br>
+</li><li class="file">
+    <a href="">118 (2021-11-13) : slub.c runtime</a>
+    <textarea rows="70" cols="128" readonly>
+    @ put_cpu_partial()
+     - c->partial 관점에서 지정한 슬랩 페이지 추가하는 alloc & free 동작에 모두 씀. 
+     - http://jake.dothome.co.kr/slub-object-free/
 
-        슬랩 페이지를 처음 할당 받은 후 모든 free object들이 c->freelist에 연결하므로
-        page->inuse 값에 page->objects 수를 대입하여 모두 사용 중으로 표기한다.
+    @ get_partial_node -> acquire_slab()
+     이때 object == 0 cpu page 에 object = t 로 한번만 함 // 처음에 partial 이 비어 있을 때 === mode = 0
+     partial 이 채워지고 총 갯수 반까지 채움 === mode = 1
+     node 에서 가져온 페이지는 cpu partial 앞쪽에 넣어주고, 기존 cpu partial  페이지는 그 다음에 붙여줌
+    
+    kmem_cache_zalloc(kmem_cache, GFP_NOWAIT);
+    -> kmem_cache_alloc(k, flags | __GFP_ZERO); 
+    -> void *ret = slab_alloc(s, gfpflags, _RET_IP_);
+    GFP_NOWAIT KSWAPD 가 일어날수도 있는 할당임
+    %__GFP_ZERO returns a zeroed page on success.
 
-        get_partial_node() -> put_cpu_partial
+    @ IPI (Inter Processor Interrupts) 소개 및 디버깅
+    - http://egloos.zum.com/rousalome/v/9966319
+
+    @ Linux kernel의 CPU governor란 무엇인가?
+    - https://dreamlog.tistory.com/4
+
+    @ "addr의 정체는 _RET_IP_ 매크로이며, 슬랩 오브젝트를 할당하거나 해제하는 코드의 주소를 저장한다."
+    - http://egloos.zum.com/rousalome/v/10021949
+    
+    @ slub: correctly bootstrap boot caches After we create a boot cache,
+     we may allocate from it until it is bootstraped.
+     This will move the page from the partial list to the cpu slab list.
+     If this happens, the loop:
+        list_for_each_entry(p, &n->partial, lru)
+     that we use to scan for all partial pages will yield nothing, and the pages
+     will keep pointing to the boot cpu cache, which is of course, invalid.
+     To do that, we should flush the cache to make sure that the cpu slab is back to the partial list.
+        
+    slub: 부트 캐시를 올바르게 부트스트랩
+     부트 캐시를 생성한 후 부트스트랩될 때까지 할당할 수 있습니다.
+     그러면 페이지가 부분 목록에서 CPU 슬래브 목록으로 이동됩니다.
+     이 경우 루프가 발생합니다.
+             list_for_each_entry(p, &n->부분, lru)
+     모든 부분 페이지를 스캔하는 데 사용하는 것은 아무 것도 산출하지 않으며 페이지는
+     물론 유효하지 않은 부팅 CPU 캐시를 계속 가리킬 것입니다.
+
+    * PageActive 		The slab is frozen and exempt from list processing.
+    * 			This means that the slab is dedicated to a purpose
+    * 			such as satisfying allocations for a specific
+    * 			processor. Objects may be freed in the slab while
+    * 			it is frozen but slab_free will then skip the usual
+    * 			list operations. It is up to the processor holding
+    * 			the slab to integrate the slab into the slab lists
+    * 			when the slab is no longer needed.
+    *
+    * 			One use of this flag is to mark slabs that are
+    * 			used for allocations. Then such a slab becomes a cpu
+    * 			slab. The cpu slab may be equipped with an additional
+    * 			freelist that allows lockless access to
+    * 			free objects in addition to the regular freelist
+    * 			that requires the slab lock.
+    
+    mm/slub: reset cpu_slab's pointer in deactivate_slab() 
+    https://github.com/iamroot16/linux/commit/d4ff6d35f618023f7b2edc5ce1a2f84362f1e7fe
+    </textarea>
+    <br>
+</li><li class="file">
+    <a href="">119 (2021-11-20) : slub.c free</a>
+    <textarea rows="2" cols="128" readonly>
+    free pre
+    </textarea>
+    <br>
+</li><li class="file">
+    <a href="">120 (2021-11-27) : slub.c free</a>
+    <textarea rows="116" cols="128" readonly>
+    [PATCH] slub: convert SLAB_DEBUG_FREE to SLAB_CONSISTENCY_CHECKS 
+    - expensive -> 디버그용
+    - https://github.com/iamroot16/linux/commit/becfda68abca673d61d5cc953e8e099816db99d9
+    
+        static __always_inline void slab_free(struct kmem_cache *s, struct page *page,
+                                void *head, void *tail, int cnt,
+                                unsigned long addr)
+        {
+            /*
+            * With KASAN enabled slab_free_freelist_hook modifies the freelist
+            * to remove objects, whose reuse must be delayed.
+            */
+            if (slab_free_freelist_hook(s, &head, &tail))
+                do_slab_free(s, page, head, tail, cnt, addr);
+            
+        
+        static __always_inline void do_slab_free(struct kmem_cache *s,
+                        struct page *page, void *head, void *tail,
+                        int cnt, unsigned long addr)
+    
+    @ __slab_free()
+    
+        (!new.inuse || !prior) && !was_frozen
+            ===> !(new.inuse && prior) && !was_frozen
+            ===>  !((new.inuse && prior) || was_frozen)
+                ===> !prior ? () : ()
+        
+        not (A and B) = not A or not B, 
+        not (A or B) = not A and not B.
+    
+    @ 질문
+     1. free 뚱딴지 슬럽 put_partial_cpu()
+     2. Drain c->freelist 에 마지막을 제외하고 하는 이유? 
+    
+    @ kmem_cache_shrink 에서 슬랩 캐시 파편화 방지를 위하여 카운팅 정렬을 한다.
+     - v2.6.22-rc1 kmem_cache_shrink 최초 커밋
+     - [PATCH] SLUB: Free slabs and sort partial slab lists in kmem_cache_shrink
+     - https://github.com/iamroot16/linux/commit/2086d26a05a4b5bda4a2f677bc143933bbdfa9f8
+     - 정렬 이후에 빼내서 node partial 에서 빼내서 쓸 때를 비교하면 아래와 같음 
+     - kmem_cache_shrink() <-> [ get_partial() ->get_partial_node() -> acquire_slab() ]
+     - https://bowbowbow.tistory.com/8
+   
+
+    @ 슬랩 참고
+     - https://hyeyoo.com/125
+    
+    
+    @ [PATCH] mm: switch s_mem and slab_cache in struct page s
+    - page->mapping = NULL -> X page->slab_cache X
+    - https://github.com/iamroot16/linux/commit/d4fc5069a39405d67937b25c0dc9249a9b6c50f1
+    
+    @ scsi sd 
+    - http://jake.dothome.co.kr/slub-cache-destroy/
+    - http://www.codesrc.com/mediawiki/index.php/SCSI2SD
+    
+    @ get_online_cpus
+    - https://lwn.net/Articles/569686/
+    
+        /*
+        * This is the main placeholder for memcg-related information in kmem caches.
+         * Both the root cache and the child caches will have it. For the root cache,
+         * this will hold a dynamically allocated array large enough to hold
+         * information about the currently limited memcgs in the system. To allow the
+         * array to be accessed without taking any locks, on relocation we free the old
+         * version only after a grace period.
+         *
+         * Root and child caches hold different metadata.
+         *
+         * @root_cache:	Common to root and child caches.  NULL for root, pointer to
+         *		the root cache for children.
+         *
+         * The following fields are specific to root caches.
+         *
+         * @memcg_caches: kmemcg ID indexed table of child caches.  This table is
+         *		used to index child cachces during allocation and cleared
+         *		early during shutdown.
+         *
+         * @root_caches_node: List node for slab_root_caches list.
+         *
+         * @children:	List of all child caches.  While the child caches are also
+         *		reachable through @memcg_caches, a child cache remains on
+         *		this list until it is actually destroyed.
+         *
+         * The following fields are specific to child caches.
+         *
+         * @memcg:	Pointer to the memcg this cache belongs to.
+         *
+         * @children_node: List node for @root_cache->children list.
+         *
+         * @kmem_caches_node: List node for @memcg->kmem_caches list.
+         */
+        struct memcg_cache_params {
+            struct kmem_cache *root_cache;
+        
+         - cgroup 관련 구조체를 참고함 slab_sysfs_init()
+
+    </textarea>
+    <br>
+</li><li class="file">
+    <a href="">121 (2021-12-04) : slub end</a>
+    <textarea rows="" cols="" readonly>
 
     </textarea>
     <br>
