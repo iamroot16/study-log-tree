@@ -4106,9 +4106,70 @@
     </textarea>
     <br>
 </li><li class="file">
-    <a href="">121 (2021-12-04) : slub end</a>
-    <textarea rows="" cols="" readonly>
+    <a href="">121 (2021-12-04) : slub review</a>
+    <textarea rows="64" cols="128" readonly>
+    메모리 할당과 해제를 반복적으로 하지 않고
+    (-> 사용하는 사람 입장에서는 메모리 할당 속도가 매우 빠르다고 느끼게됨),
+    미리 풀을 만들어 놓음. 풀이 저장 공간의 단계를 나눠놓고 특정 타입에 대한 할당이 많이 필요하면 
+    아래 단계에서 미리 만들어놓은 오브젝트를 가져다 쓸 수 있음.
+    
+    > 단계? 어떤 식으로 엔트리를 미리 생성?
+    
+    오브젝트가 미리 할당되어 있는 공간은 percpu->{page, partial}, node->{partial} 이 있음. 
+    
+    > 캐시?
+    캐시 == kmem_cache
+    object size align
+    풀이 4개의 객체를 가짐
+    [🥱, 🥱, 🥱, 🥱]
+    
+    풀에는 필요할 때 사용할 수 있는 3개의 객체가 있고, 1개의 객체는 사용 중이다.
+    [🥱, 🥱, 🥱]                         😓
+    
+    ** 메모리 할당자
+    memory allocator
+    - 각종  간단한 메모리 할당자
+        - https://news.ycombinator.com/item?id=18180940
+    - K & R allocator (C progamming 책 185 페이지 8.7 A Storage Allocator)
+        - https://stackoverflow.com/questions/13159564/explain-this-implementation-of-malloc-from-the-kr-book
+        - https://ucb.class.cs61c.narkive.com/SHkzhiG6/the-k-r-memory-allocator
+        - https://kremlin.cc/k&r.pdf
+    
+    > kmem_cache_node.list_lock IRQ_disable 을 해야하나?
+    안하고도 쓰면 안됨! 
+    하지만 spinlock 은 IRQ 를 켜놓은 상태에서도 사용할 수 있는 API 는 있음 -> 경합이 덜 일어남? 안일어남? 근데 락은 왜걸지..
 
+    > 스핀락으로 해결되지 않는가? IRQ 도 꺼야 이런 경우가 해결되는가?
+    IRQ_disable 을 안한 상태에서 기존에 할당을 받으려던 슬랩 할당 프로세스에서
+    동시에 다른 프로세스도 할당을 진행하여 똑같은 오브젝트를 받으려고 함
+    할당 하는 오브젝트가 서로 다른 프로세스인데, 할당하려는 같은 오브젝트를 가르고 있음!
+    스핀락 플래그는 true
+
+    https://lore.kernel.org/kernelnewbies/CAMo8BfKtbu3KmauzxUfkVxDA154yNNEQCXXwH04uPDyCW7g1oQ@mail.gmail.com/
+
+                CPU-0
+
+        P1
+    node.list_lock -> true
+
+                            P2
+                        Wating....
+                        Wating....
+                        Wating....
+    node.list_lock -> false        Wating....
+                        node.list_lock -> true
+
+    선점은 활성화 되어있음 -> 여러 프로세스를 돌리면서 동시에 처리함
+    IRQ_disable 해야함. -> 인터럽트에 등록한 코드를 실행함
+    IRQ_disable -> 인터럽트도 처리 안함, 선점(타이머 인터럽트)도 안함
+
+    @ trace
+    - https://blogs.vmware.com/opensource/2019/11/12/ftrace-linux-kernel/
+
+    @ slab_free()
+    freelist 가 가르키는 오브젝트를 해제한 오브젝트로 바꿔주고, 기존 freelist 가 가르키는 오브젝트를 뒤에 연결해줌
+
+    LRU - pvec 비슷한 컨셉이다.
     </textarea>
     <br>
 </li></ol>
